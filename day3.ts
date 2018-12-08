@@ -16,125 +16,187 @@ class Storage {
             }
         }
     }
-
-    display() {
-        for (let i = 0; i < this.storage.length; i++) {
-            let tmp = '';
-            for (let j = 0; j < this.storage[i].length; j++) {
-                tmp += this.storage[i][j];
-            }
-            console.log('    ' + tmp);
-        }
-    }
-    
 }
 
-function getCoo(line: string): [number, number] {
-    line.replace(' ', '');
-    let res = line.split(',');
-
-    return [Number(res[0]), Number(res[1])];
-
+interface dependency {
+    step: string;
+    dependsFromStep: string[];
 }
 
-function getMax(data): [number, number] {
-    let ret = [0, 0];
-    for (let line of data) {
-        let c = getCoo(line);
-        if (c[0] > ret[0]) ret[0] = c[0];
-        if (c[1] > ret[1]) ret[1] = c[1];
-    }
-
-    return [ret[0], ret[1]];
+interface worker {
+    working: string;
+    time: number;
 }
 
-function getDistance(c1, c2): number {
-    let dist1 = c1[0] - c2[0];
-    let dist2 = c1[1] - c2[1];
-
-    if (dist1 < 0) dist1 *= -1;
-    if (dist2 < 0) dist2 *= -1;
-
-    return dist1 + dist2;
+function getDependency(line: string): dependency {
+    let tmp = line.split(' ');
+    return { step: tmp[7], dependsFromStep: [tmp[1]] };
 }
 
-function getIdMinimalDistance(data, c1): number {
-    let id = 0;
-    let minDist = 1000000000000000000000000;
-    let minDistId = 0;
-    for (let line of data) {
-        id++;
+function getNeededTime(letter: string): number {
+    return letter.charCodeAt(0)-'A'.charCodeAt(0) + 61;
+    // return letter.charCodeAt(0)-'A'.charCodeAt(0) +1;
+}
 
-        let c2 = getCoo(line);
-        let tmpdist = getDistance(c1, c2);
-        // console.log('Distance: ' + c1 + ' to ' + c2 + ' = ' + tmpdist);
+function getStepWithoutDep(storage: dependency[]): dependency[] {
+    let stepsWithoutDep: dependency[];
+    stepsWithoutDep = new Array();
 
-        if (minDist > tmpdist) {
-            minDist = tmpdist;
-            minDistId = id;
-        } else if (minDist == tmpdist) {
-            minDistId = 0;
-        }
+    // search
+    for (let element of storage) {
+        if (element.dependsFromStep.length == 0) stepsWithoutDep.push(element);
     }
 
-    return minDistId;
+    return stepsWithoutDep;
 }
 
-function getSize(st: Storage, id: number): number {
-    let size = 0;
-    // console.log('Size: ' + st.storage.length);
-    for (let i = 0; i < st.storage.length; i++) {
-        for (let j = 0; j < st.storage[i].length; j++) {
-            // console.log('Checking x:' + i + ' y:' + j + ' value: ' + st.storage[i][j]);
-            if (st.storage[i][j] == id) {
-                if ((i == 0) || (j == 0) || (i == st.storage.length-1) || (j == st.storage[i].length-1)) return -1;
-                size++;
-            }
-        }
+function getStep(storage: dependency[]): {l: string, s: dependency[]} {
+    let stepsWithoutDep: dependency[];
+    stepsWithoutDep = new Array();
+
+    // search
+    for (let element of storage) {
+        if (element.dependsFromStep.length == 0) stepsWithoutDep.push(element);
     }
 
-    return size;
+    if (stepsWithoutDep.length == 0) return { l: '', s: storage };
+
+    stepsWithoutDep.sort((a,b) => (a.step > b.step) ? 1 : 0);
+    console.log(stepsWithoutDep[0].step);
+
+    // remove
+    storage = storage.filter((a) => a.step != stepsWithoutDep[0].step);
+
+    return { l: stepsWithoutDep[0].step, s: storage };
+}
+
+
+function done(storage: dependency[], done: string): dependency[] {
+       // remove
+       storage = storage.filter((a) => a.step != done);
+       for (let element of storage) {
+           element.dependsFromStep = element.dependsFromStep.filter(a => a != done);
+       }
+   
+       // display
+       /*for (let element of storage) {
+           console.log(element);
+       }*/
+   
+       return storage;
+}
+
+function getNextStep(storage: dependency[]): {l: string, s: dependency[]} {
+    let stepsWithoutDep: dependency[];
+    stepsWithoutDep = new Array();
+
+    // search
+    for (let element of storage) {
+        if (element.dependsFromStep.length == 0) stepsWithoutDep.push(element);
+    }
+
+    if (stepsWithoutDep.length == 0) return { l: '', s: storage };
+
+    stepsWithoutDep.sort((a,b) => (a.step > b.step) ? 1 : 0);
+    console.log(stepsWithoutDep[0].step);
+
+    // remove
+    storage = storage.filter((a) => a.step != stepsWithoutDep[0].step);
+    for (let element of storage) {
+        element.dependsFromStep = element.dependsFromStep.filter(a => a != stepsWithoutDep[0].step);
+    }
+
+    // display
+    /*console.log('exit:');
+    for (let element of storage) {
+        console.log(element);
+    }*/
+
+    return { l: stepsWithoutDep[0].step, s: storage };
 }
 
 function execute(data) {
-    let maxc = getMax(data);
-    console.log('Max x:' + maxc[0] + ' y:' + maxc[1]);
+    let storage: dependency[];
+    storage = new Array();
 
-    // create storage
-    let storage = new Storage(maxc);
-
-    for (let i = 0; i < maxc[0]+1; i++) {
-        for (let j = 0; j < maxc[1]+1; j++) {
-            let id = getIdMinimalDistance(data, [i,j]);
-            storage.storage[i][j] = id;
-            // console.log('Point x:' + i + ' y:' + j + ' min dist to: '+ id + 'set to:'+ storage.storage[i][j]);
-        }
-    }
-
-    // storage.display();
-
-    let id = 0;
-    let maxSize = 0;
     for (let line of data) {
-        id++;
-        let size = getSize(storage, id);
-        console.log('ID: ' + id + ' ' + getCoo(line) + ' size of: ' + size);
-        if (size > maxSize) maxSize = size;
-    }
-    console.log('Max: ' + maxSize);
+        let dep = getDependency(line);
+        let found = storage.find(val => val.step == dep.step);
+        if (found) {
+            if (found.dependsFromStep.find(step => step == dep.step[0])) {
 
-    let size = 0;
-    for (let i = 0; i < storage.storage.length; i++) {
-        for (let j = 0; j < storage.storage.length; j++) {
-            let dist = 0;
-            for (let line of data) {
-                dist += getDistance([i,j], getCoo(line));
+            } else {
+                found.dependsFromStep.push(dep.dependsFromStep[0]);
             }
-            if (dist < 10000) size++;
+        } else {
+            storage.push(dep);
         }
+
+        found = storage.find(val => val.step == dep.dependsFromStep[0]);
+        if (!found) storage.push({ step: dep.dependsFromStep[0], dependsFromStep: new Array() });
     }
-    console.log('Size: ' + size);
+
+    let time = 0;
+    
+    let workers: worker[] = [ { working: '', time: 0 }, { working: '', time: 0 }, { working: '', time: 0 }, { working: '', time: 0 }, { working: '', time: 0 } ];
+    while(1) {
+
+        {
+            let todos = getStepWithoutDep(storage);
+            let notWorking = workers.filter(a => a.working == '');
+            do {
+                console.log('check if we can improve');
+                console.log(workers);
+                console.log(todos);
+                console.log(notWorking);
+                /* check if we can improve */
+                if ( (notWorking.length > 0) || ( todos.length > 0)) {
+                    console.log('improvving');
+                    let ns = getStep(storage);
+                    storage = ns.s;
+                    workers[workers.findIndex(a => (a.working == ''))].time = getNeededTime(ns.l);
+                    workers[workers.findIndex(a => (a.working == ''))].working = ns.l;
+                }
+
+                todos = getStepWithoutDep(storage);
+                notWorking = workers.filter(a => a.working == '');
+            }
+            while ( (todos.length != 0) && (notWorking.length != 0) );
+        }
+
+        {
+            let todos = getStepWithoutDep(storage);
+            let notWorking = workers.filter(a => a.working == '');
+            do {
+                console.log('Time: ' + time);
+                console.log('Workers');
+                console.log(workers);
+                console.log('TODOS');
+                console.log(todos);
+                /* move time */
+                time++;
+                for (let i = 0; i < workers.length; i++) {
+                    if (workers[i].working != '') {
+                        workers[i].time--;
+                        if (workers[i].time == 0) {
+                            storage = done(storage, workers[i].working);
+                            workers[i].time = -1;
+                            workers[i].working = '';
+                        }
+                    }
+                }
+
+                todos = getStepWithoutDep(storage);
+                notWorking = workers.filter(a => a.working == '');
+
+                if ((todos.length == 0) && (notWorking.length == workers.length)) return time;
+            }
+            while ( (todos.length == 0) || (notWorking.length == 0) );
+        }
+
+    }
 }
 
-execute(data);
+let str = execute(data);
+console.log(str);
 
