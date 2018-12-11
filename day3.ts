@@ -1,146 +1,79 @@
 import { dataTest } from "./data";
 import { data } from "./data";
 
-class Marbel {
-    left: Marbel;
-    right: Marbel;
-    value: number;
+interface cord {
+    x: number;
+    y: number;
+}
 
-    constructor(val: number, l = undefined, r = undefined) {
-        if ((l == undefined) && (r == undefined)) {
-            this.left = this;
-            this.right = this;
-        } else {
-            this.left = l;
-            this.right = r;
-        }
+class Point {
+    pos: cord;
+    vel: cord;
 
-        this.value = val;
-        
-        // console.log('New Marbel with value: ' + this.value + ' left: ' + this.left.value + ' right:' + this.right.value);
-    }
-
-    display() {
-        let strr = '' + this.value + ' ';
-        let strl = '' + this.value + ' ';
-        
-        let nextr = this.right;
-        let nextl = this.left;
-        while (nextr != this) {
-            strr += nextr.value + ' ';
-            strl += nextl.value + ' ';
-            nextr = nextr.right;
-            nextl = nextl.left;
-            if (strr.length > 100) break;
-        }
-
-        strr += nextr.value + ' ';
-        strl += nextl.value + ' ';
-
-        console.log('Right: ' + strr);
-        console.log('Left:  ' + strl);
-        
-    }
-
-    removeMarbel(): {m: Marbel, p:number} {
-        // 0 16  8 17  4 18  9 19  2 20 10 21  5(22)11  1 12  6 13  3 14  7 15
-        // 0 16  8 17  4 18   (19) 2 20 10 21  5 22 11  1 12  6 13  3 14  7 15
-        let ret = this.left.left.left.left.left.left;
-
-        let p = ret.left.value;
-        // console.log('Removed Value: '+ p);
-
-
-        // remove the one
-        // console.log('Remove:');
-        // console.log(ret.left);
-
-        ret.left.left.right = ret;
-        ret.left = ret.left.left;
-
-        return {m: ret, p:p};
-    }
-
-    add(val: number): Marbel {
-        // 0 -> 0 -> 0 -> 0
-        let place = this.right;
-        let newM: Marbel;
-        // 0 -> 1 <- 0
-
-        if ((place.left != place.right) && (place.right != place)) {
-            newM = new Marbel(val, place, place.right);
-            place.right.left = newM;
-            place.right = newM;
-        } else if ((place.left == place.right) && (place.right != place)) {
-            console.log('Same2');
-            // 0 1
-            // 0 2 1
-            newM = new Marbel(val, place, place.right);
-            place.right.left = newM;
-            place.right = newM;
-        } else {
-            console.log('Same');
-            newM = new Marbel(val, place, place);
-            place.right = newM;
-            place.left = newM;
-        }
-
-        /* console.log('This: ' + this.value + ' left: ' + this.left.value + ' right:' + this.right.value);
-        console.log('New: ' + newM.value + ' left: ' + newM.left.value + ' right:' + newM.right.value);
-
-        console.log('Check L this: ' + this.value + ' ' + this.left.value + ' ' + this.left.left.value + ' ' + this.left.left.left.value + ' ' + this.left.left.left.left.value);
-        console.log('Check R this: ' + this.value + ' ' + this.right.value + ' ' + this.right.right.value + ' ' + this.right.right.right.value + ' ' + this.right.right.right.right.value);
-
-        console.log('Check L new: ' + newM.value + ' ' + newM.left.value + ' ' + newM.left.left.value + ' ' + newM.left.left.left.value + ' ' + newM.left.left.left.left.value);
-        console.log('Check R new: ' + newM.value + ' ' + newM.right.value + ' ' + newM.right.right.value + ' ' + newM.right.right.right.value + ' ' + newM.right.right.right.right.value);
-
-        newM.display();*/
-
-        return newM;
+    constructor(p: cord, v: cord) {
+        this.pos = p;
+        this.vel = v;
     }
 }
 
+let storage: Point[];
 
-function execute(totalplayers: number, marbels: number) {
-    let score: number[];
-    let marbel = new Marbel(0);
-    let start = marbel;
-    let player = 0;
+function GetInfo(line: string): {p: cord, v:cord} {
+    // position=< 9,  1> velocity=< 0,  2>
+    let pos = line.split('> velocity=')[0].split('osition=<')[1].split(',');
+    let vel = line.split('> velocity=<')[1].split('>')[0].split(',');
+    //console.log('Line: ' + line);
 
-    score = new Array<number>(totalplayers);
-    for (let i = 0; i < totalplayers+1; i++) {
-        score[i] = 0;
-    }
-    // start.display();
-    
-    for (let i = 1; i <= marbels; i++) {
-        console.log('Play: ' + i);
-        player++;
-        if (player > totalplayers) {
-            player = 1;
-        }
+    let po: cord = { x: Number(pos[0]), y: Number(pos[1]) };
+    let ve: cord = { x: Number(vel[0]), y: Number(vel[1]) };
 
-        if (i % 23 != 0) {
-            // console.log('add marbel')
-            marbel = marbel.add(i);
-            // start.display();
-        } else {
-            console.log('update score player ' + player);
-            let rem = marbel.removeMarbel();
-            console.log('Player: ' + player + 'Points: ' + i + ' ' + rem.p + ' : ' + (i + rem.p));
-            score[player] += i + rem.p;
-            marbel = rem.m;
-        }
+    //console.log(po)
+    //console.log(ve)
 
-    }
-
-    console.log('Scores: ');
-    console.log(score);
-
-    let max = score.reduce((a, b) => (a>b) ? a : b);
-    console.log('Player: ' + score.indexOf(max) + ' Score: ' + max);
+    return {p: po, v: ve};
 }
 
-let str = execute(410, 7205900);
-console.log(str);
+function display(c: cord, storage: Point[]) {
 
+    for(let y = c.y; y < c.y+30; y++) {
+        let str = '';
+        let points = storage.filter(a => a.pos.y == y);
+        for(let x= c.x; x < c.x+120; x++) {
+            let found = points.find(a => a.pos.x == x);
+            if (found != undefined) {
+                // console.log('X: ' + x + ' Y: ' + y);
+                // console.log(found);
+                str += '#';
+            } else {
+                str += '.';
+            }
+        }
+        console.log(str);
+    }
+}
+
+function run(d: string[]) {
+    storage = new Array<Point>(d.length);
+    for (let i = 0; i < d.length; i++) {
+        let data = GetInfo(d[i]);
+        storage[i] = new Point(data.p, data.v);
+    }
+
+    let time = 0;
+    while(1) {
+        let minX = storage.reduce((a,b) => (a.pos.x > b.pos.x) ? b : a );
+        let minY = storage.reduce((a,b) => (a.pos.y > b.pos.y) ? b : a );
+        console.log('Time: ' + time);
+        display({x: minX.pos.x, y: minY.pos.y}, storage);
+
+        storage.map(a => {
+            a.pos.x = a.pos.x + a.vel.x;
+            a.pos.y = a.pos.y + a.vel.y;
+        });
+        time ++;
+
+    }
+
+}
+
+run(data);
