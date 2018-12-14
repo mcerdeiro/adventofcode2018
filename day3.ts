@@ -1,134 +1,298 @@
-import { dataTest } from "./data";
 import { data } from "./data";
+import { dataTest } from "./data";
 
-function display(p: boolean[]) {
-    let str = '';
-    for (let i = 0; i < p.length; i++) {
-        str += p[i] ? '#' : '.';
-    }
-    console.log(str);
+enum CarMoves {
+    left, straigt, right
 }
 
-function process(pots: boolean[], lives: boolean[][], dies: boolean[][]): boolean[] {
-    let ret = new Array<boolean>(pots.length)
-    for (let i = 0; i < ret.length; i++) {
-        ret[i] = false;
+class Car {
+    x: number;
+    y: number;
+    private old:string;
+    CarMoves: CarMoves;
+
+    getOld(): string {
+        return this.old;
     }
-
-    for (let i = 2; i < pots.length-2; i++) {
-        let tmp =  new Array<boolean>();
-        tmp.push(pots[i-2]);
-        tmp.push(pots[i-1]);
-        tmp.push(pots[i-0]);
-        tmp.push(pots[i+1]);
-        tmp.push(pots[i+2]);
-
-        // console.log('Search for in pos:' + i);
-        // console.log(tmp);
-        let l = lives.filter(a => {
-            for (let i = 0; i < a.length; i++) {
-                if (a[i] != tmp[i])
-                    return false;
-            }
-            // console.log('Lives: ');
-            // console.log(a);
-            return true;
-            }).length;
-        let d = dies.filter(a => {
-            for (let i = 0; i < a.length; i++) {
-                if (a[i] != tmp[i])
-                    return false;
-            }
-            // console.log('Dies: ');
-            // console.log(a);
-            return true;
-            }).length;
-        if (l > 0) {
-            ret[i] = true;
+    setOld(o: string) {
+        if (isCar(o)) {
+            console.log('Setting old to car');
+            console.log(this);
         }
+        this.old = o;
+    }
+    
+    constructor(x: number, y: number, dir: string) {
+        this.x = x;
+        this.y = y;
+        this.CarMoves = CarMoves.left;
+        if ((dir == '<') ||
+            (dir == '>') )
+            this.setOld('-');
+
+        if ((dir == 'v') ||
+            (dir == '^') )
+            this.setOld('|');
+    }
+}
+
+function isCar(s: string): boolean {
+    if ( (s == '<') ||
+         (s == '>') ||
+         (s == 'v') ||
+         (s == '^'))
+         return true;
+
+    return false;
+}
+
+function turn(data: string[][], ret: string[][], car: Car) {
+    let y = car.y;
+    let x = car.x;
+    if (isCar(car.getOld())) {
+        console.log('Crash how???');
+        // ret[y][x] = 'X';
+    } else
+    switch(car.getOld()) {
+        case '/':
+            console.log('Case x:' + x + 'y' + y + ' ' + ret[y][x]);
+
+            if (ret[y][x] == '>') ret[y][x] = '^';
+            else if (ret[y][x] == '<') ret[y][x] = 'v';
+            else if (ret[y][x] == 'v') ret[y][x] = '<';
+            else if (ret[y][x] == '^') ret[y][x] = '>';
+            // console.log('Case x:' + x + 'y' + y + ' ' + ret[y][x]);
+            break;
+        case '\\':
+            // console.log('turn');
+            // console.log(ret[y][x]);
+            if (ret[y][x] == '>') ret[y][x] = 'v';
+            else if (ret[y][x] == '<') ret[y][x] = '^';
+            else if (ret[y][x] == '^') ret[y][x] = '<';
+            else if (ret[y][x] == 'v') ret[y][x] = '>';
+            // console.log(ret[y][x]);
+            break;
+        case '+':
+            if (car.CarMoves == CarMoves.left) {
+                // console.log(car);
+                // console.log(ret[y][x]);
+                // console.log('x' + x + 'y' + y);
+                if (ret[y][x] == '>') ret[y][x] = '^';
+                else if (ret[y][x] == '<') ret[y][x] = 'v';
+                else if (ret[y][x] == '^') ret[y][x] = '<';
+                else if (ret[y][x] == 'v') ret[y][x] = '>';
+                car.CarMoves = CarMoves.straigt;
+            } else if (car.CarMoves == CarMoves.straigt) {
+                car.CarMoves = CarMoves.right;
+            } else if (car.CarMoves == CarMoves.right) {
+                if (ret[y][x] == '>') ret[y][x] = 'v';
+                else if (ret[y][x] == '<') ret[y][x] = '^';
+                else if (ret[y][x] == '^') ret[y][x] = '>';
+                else if (ret[y][x] == 'v') ret[y][x] = '<';
+                car.CarMoves = CarMoves.left;
+            }
+            break;
+    }
+}
+
+function moveCar(data: string[][], ret: string[][], x: number, y: number, car: Car, cars: Car[]) {
+    switch(data[y][x]) {
+        case '<':
+            ret[y][x] = car.getOld();
+            car.setOld(ret[y][x-1]);
+            if (isCar(car.getOld())) {
+                console.log('Crash x'+ x +' y' +y);
+                let crashcar = cars.find(a => a.x == (x-1) && a.y == y);
+                console.log(crashcar);
+                ret[y][x-1] = crashcar.getOld();
+                data[y][x-1] = crashcar.getOld(); 
+                crashcar.x = -10;
+                crashcar.y = -10;
+                car.x = -10;
+                car.y = -10;
+            }
+            else {
+                ret[y][x-1] = '<';
+                car.x -= 1;
+                turn(data, ret, car);
+            }
+            break;
+
+        case '>':
+            ret[y][x] = car.getOld();
+            car.setOld(ret[y][x+1]);
+            if (isCar(car.getOld())) {
+                console.log('Crash x'+ x +' y' +y);
+                let crashcar = cars.find(a => a.x == (x+1) && a.y == y);
+                console.log(crashcar);
+                ret[y][x+1] = crashcar.getOld();
+                data[y][x+1] = crashcar.getOld();
+                crashcar.x = -10;
+                crashcar.y = -10;
+                car.x = -10;
+                car.y = -10;
+            }
+            else {
+                ret[y][x+1] = '>';
+                car.x += 1;
+                turn(data, ret, car);
+            }
+            break;
+
+        case '^':
+            console.log('Moving up');
+            console.log(car);
+            ret[y][x] = car.getOld();
+            car.setOld(ret[y-1][x]);
+            if (isCar(car.getOld())) {
+                console.log('Crash x'+ x +' y' +y);
+                let crashcar = cars.find(a => a.x == (x) && a.y == (y-1));
+                console.log(crashcar);
+                ret[y-1][x] = crashcar.getOld();
+                data[y-1][x] = crashcar.getOld();
+                crashcar.x = -10;
+                crashcar.y = -10;
+                car.x = -10;
+                car.y = -10;
+            }
+            else {
+                ret[y-1][x] = '^';
+                car.y -= 1;
+                turn(data, ret, car);
+            }
+            break;
+
+        case 'v':
+            ret[y][x] = car.getOld();
+            car.setOld(ret[y+1][x]);
+            if (isCar(car.getOld())) {
+                console.log('Crash x'+ x +' y' +y);
+                let crashcar = cars.find(a => a.x == (x) && a.y == (y+1));
+                console.log(crashcar);
+                ret[y+1][x] = crashcar.getOld();
+                data[y+1][x] = crashcar.getOld();
+                crashcar.x = -10;
+                crashcar.y = -10;
+                car.x = -10;
+                car.y = -10;
+            }
+            else {
+                ret[y+1][x] = 'v';
+                car.y += 1;
+                turn(data, ret, car);
+            }
+            break;
+    }
+}
+
+function move(data: string[][], cars: Car[]): string[][] {
+    let ret: string[][];
+    ret = new Array<string[]>(data.length);
+    for (let y = 0; y < data.length; y++) {
+        let tmp = new Array<string>(data[y].length)
+        for (let x = 0; x < data[y].length; x++) {
+            tmp[x] = data[y][x];
+        }
+        ret[y] = tmp;
     }
 
-    for (let i = 0; i < ret.length; i++) {
-        pots[i] = ret[i];
+    for (let y = 0; y < data.length; y++) {
+        // console.log('Length: '+ data[y].length);
+        for (let x = 0; x < data[y].length; x++) {
+            // console.log(data);
+            if (isCar(data[y][x])) {
+                // console.log('Moving x: '+ x + ' y' + y);
+                let car = cars.find(a => a.x == x && a.y == y);
+                moveCar(data, ret, x, y, car, cars);
+            }
+        }
     }
 
     return ret;
 }
 
-function run(data: string[]) {
-    const diff = 4000;
-    let pots: boolean[];
-    let lives: boolean[][];
-    let dies: boolean[][];
-
-    lives = Array<boolean[]>();
-    dies = Array<boolean[]>();
-
-    pots = new Array<boolean>();
-    for (let i = 0; i < diff; i++) {
-        pots.push(false);
-    }
-
-    let initStates = data[0].split('nitial state: ')[1].split('');
-    for (let initState of initStates) {
-        if(initState == '#') {
-            pots.push(true);
-        } else {
-            pots.push(false);
-        }
-    }
-
-    for (let i = 0; i < diff; i++) {
-        pots.push(false);
-    }
-
-    display(pots);
-
-    data.shift();
-
-    for (let d of data) {
-        let tmp = d.split(' => ');
-        let lord: boolean[];
-        lord = new Array<boolean>();
-        for (let val of tmp[0].split('')) {
-            if (val == '#')
-                lord.push(true);
-            else
-                lord.push(false);
-        }
-        if (tmp[1] == '#')
-            lives.push(lord);
-        else
-            dies.push(lord);
-    }
-
-    console.log(lives);
-    console.log(dies);
-
-    display(pots);
-    let tmp_old = 0;
-    for(let i = 0; i < 1500; i++) {
-        process(pots, lives, dies);
-        display(pots);
-        let tmp = 0;
-        for(let i = 0; i < pots.length; i++) {
-            if (pots[i] == true) {
-                tmp += i-diff;
+function initCars(data: string[][]): Car[] {
+    // console.log(data);
+    let cars = new Array<Car>();
+    for (let y = 0; y < data.length; y++) {
+        for (let x = 0; x < data[y].length; x++) {
+            if (isCar(data[y][x])) {
+                cars.push(new Car(x,y,data[y][x]));
             }
         }
-        let dif = tmp-tmp_old;
-//        console.log('I:' + (i+1) + ' Summ: ' + tmp + ' diff: ' + (dif));
-        tmp_old = tmp;
-
-        
     }
-    display(pots);
+
+    return cars;
+}
+
+function display(data: string[][]) {
+    for (let y = 0; y < data.length; y++) {
+        console.log(data[y].reduce((a,b) => a + b));
+    }
+}
+
+function onlyOneCar(data): boolean {
+    let count = 0;
+    let cx = 0;
+    let cy = 0;
+    for (let y = 0 ; y < data.length; y++) {
+        for (let x = 0 ; x < data[y].length; x++) {
+            if (isCar(data[y][x])) {
+                cx = x;
+                cy = y; 
+                count++;
+            }
+        }
+    }
 
 
+    if (count == 1) {
+        console.log('Only one car x: '+ cx + ' y: '+ cy);
+        return true;
+    }
+    console.log('Current cars: ' + count);
+    return false;
+}
+
+function hasCrash(data): boolean {
+    for (let y = 0 ; y < data.length; y++) {
+        for (let x = 0 ; x < data[y].length; x++) {
+            if (data[y][x] == 'X') {
+                console.log('Crash at x:' + x + ' y:' + y);
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+function execute(data: string[][]) {
+    let cars: Car[];
+
+    cars = initCars(data);
+
+    display(data);
+    for (let i = 1; i < 1000000; i++) {
+        console.log('Move: ' + i);
+        data = move(data, cars);
+        display(data);
+        
+        // if (hasCrash(data)) return;
+        if (onlyOneCar(data)) return;
+    }
 
 }
 
 
-run(data);
-// let gen = 50000000000;
-// console.log(8990+58*(gen-123));
+function adapt(data: string[]) {
+    let tmp: string[][];
+    tmp = new Array<string[]>();
+    
+    for (let i = 0; i < data.length; i++) {
+        tmp.push(data[i].split(''));
+    }
+
+    execute(tmp);
+}
+
+adapt(data);
