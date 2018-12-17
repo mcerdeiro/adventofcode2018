@@ -117,7 +117,7 @@ class TableElement {
     dist: { distance: number, isMinimum: boolean };
 
     resetDist() {
-        this.dist.distance = 100000000000;
+        this.dist.distance = undefined;
         this.dist.isMinimum = false;
     }
 
@@ -125,8 +125,12 @@ class TableElement {
         return this.coor.x + this.coor.y * this.table.table[0].length;
     }
 
-    getEmptyNeighborsWithoutMinDist(): Array<TableElement> {
-        return this.getEmptyNeighbors().filter(a => a.dist.isMinimum == false);
+    getEmptyNeighborsWithoutMinDist(d = -1): Array<TableElement> {
+        let tmp = this.getEmptyNeighbors();
+        if (d == -1)
+            return tmp.filter(a => a.dist.distance == undefined);
+        else
+            return tmp.filter(a => a.dist.distance == undefined || a.dist.distance < d);
     }
 
     getEmptyNeighbors(): Array<TableElement> {
@@ -138,10 +142,13 @@ class TableElement {
 
         if (this.coor.y>0)
             tmp.push(this.table.table[this.coor.y-1][this.coor.x]);
+
         if (this.coor.x>0)
-            tmp.push(this.table.table[this.coor.y][this.coor.x+1]);
-        if (this.coor.x<this.table.table[this.coor.y].length-1)
             tmp.push(this.table.table[this.coor.y][this.coor.x-1]);
+
+        if (this.coor.x<this.table.table[this.coor.y].length-1)
+            tmp.push(this.table.table[this.coor.y][this.coor.x+1]);
+
         if (this.coor.y<this.table.table.length-1)
             tmp.push(this.table.table[this.coor.y+1][this.coor.x]);
 
@@ -164,7 +171,8 @@ class TableElement {
     }
 
     setDistance(distance: number, isMinimum = false, te: TableElement) {
-        if (this.dist.distance > distance) {
+
+        if ((this.dist.distance == undefined) || (this.dist.distance > distance)) {
             this.dist.distance = distance;
             this.table.distanceChanged = true;
         }
@@ -176,21 +184,70 @@ class TableElement {
             }
         }
 
-        let ne = this.getEmptyNeighborsWithoutMinDist().map(a => a.setDistance(distance+1, true, te));
-        
-        
+        let ne = this.getEmptyNeighborsWithoutMinDist(this.dist.distance+1);
+        ne.map(a => a.setDistance(this.dist.distance+1, false, te));
     }
 
     distance(te: TableElement): number {
         this.table.resetDist();
 
-        console.log('Disntace');
-        this.print();
-        te.print();
+        // console.log('Disntace');
+        // this.print();
+        // te.print();
+
+        te.dist.distance = 0;
+        te.dist.isMinimum = true;
 
         te.getEmptyNeighbors().map(a => a.setDistance(1, true, te));
-        this.table.display();
-        throw('distance');
+        
+        // console.log('aca');
+
+        while (this.table.distanceChanged == true) {
+            this.table.distanceChanged = false;
+            // this.table.display();
+            for(let y = 0; y < this.table.table.length; y++) {
+                for (let x = 0; x < this.table.table[y].length; x++) {
+                    if (this.table.table[y][x].dist.distance == undefined) break;
+                    // console.log('Checking:')
+                    // console.log(this.table.table[y][x].print());
+                    // console.log('vecinos')
+                    let emptyN = this.table.table[y][x].getEmptyNeighbors();
+                    emptyN = emptyN.filter(a => a.dist.distance == undefined);
+                    // emptyN.map(a => a.print());
+                    emptyN.map(a => {
+                        if (a.dist.distance == undefined) {
+                            console.log('Invalid Distsance');
+                            a.print();
+                            throw ('invalid distance');
+                        }
+                    }
+                    );
+                    if (emptyN.length > 0) {
+                        let mindist = emptyN.reduce((a,b) => (a.dist.distance < b.dist.distance) ? a : b);
+                        if (mindist.dist.distance + 1 < this.dist.distance) {
+                            this.dist.distance = mindist.dist.distance+1;
+                            this.table.distanceChanged = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        // console.log('Plan');
+        // this.table.display();
+        // console.log('Distance of');
+        // this.print();
+        let dist = this.getEmptyNeighbors();
+        // console.log('Vecions');
+        // dist.map(a => a.print());
+        dist = dist.filter(a => a.dist.distance != undefined);
+        if (dist.length > 0) {
+            let mindist = dist.reduce((a,b) => (a.dist.distance < b.dist.distance) ? a : b);
+            return mindist.dist.distance;
+        } else {
+            return 100000000000000;
+        }
+
         // let de = new DistanceTree(this, te);
         // throw('Final');
         // let dx = Math.abs(this.coor.x - te.coor.x);
@@ -235,7 +292,7 @@ class TableElement {
 
     public print() {
         if (this.cont == undefined)
-            console.log('Type: . X:' + this.coor.x + ' Y: ' + this.coor.y);
+            console.log('Type: . X:' + this.coor.x + ' Y: ' + this.coor.y + ' Dist: ' + this.dist.distance);
         else
             this.cont.print();
     }
@@ -287,7 +344,7 @@ class Table {
             for (let y = 0; y < this.table.length; y++) {
                 for (let x = 0; x < this.table[y].length; x++) {
                     if (this.table[y][x].cont != undefined) {
-                        if (this.table[y][x].cont.type == ObjectTypeType.elf)
+                        if (this.table[y][x].cont.type == ObjectTypeType.goblin)
                             this.goblins.push(this.table[y][x].cont);
                     }
                 }
@@ -337,7 +394,9 @@ class Table {
             let dist = '';
             for (let x = 0; x < this.table[y].length; x++) {
                 str += this.table[y][x].display();
-                if (this.table[y][x].isEmpty())
+                if (this.table[y][x].dist.distance == undefined)
+                    dist += '-';
+                else if (this.table[y][x].isEmpty())
                     dist += (this.table[y][x].dist.distance > 9) ? 9 : this.table[y][x].dist.distance;
                 else
                     dist += '#';
@@ -383,10 +442,10 @@ class ObjectType {
         toattack = toattack.filter(a => a.cont.hitpoints <= toattack[0].cont.hitpoints);
         toattack = toattack.sort(a => a.getReadingOrder());
 
-        console.log('Attacker:');
-        this.print();
-        console.log('Attacked:');
-        toattack[0].cont.print();
+        // console.log('Attacker:');
+        //this.print();
+        // console.log('Attacked:');
+        // toattack[0].cont.print();
         toattack[0].cont.attacked();
     }
 
@@ -400,7 +459,7 @@ class ObjectType {
             // console.log(posiblemoves.filter(a => a.cont != undefined && a.cont.type == ObjectTypeType.elf));
             let toattack = posiblemoves.filter(a => a.cont != undefined && a.cont.type == ObjectTypeType.elf);
             if (toattack.length > 0) {
-                console.log('No move, attack1');
+                // console.log('No move, attack1');
                 this.attack(toattack);
                 return true;
             }
@@ -409,7 +468,7 @@ class ObjectType {
         if (this.type == ObjectTypeType.elf) {
             let toattack = posiblemoves.filter(a => a.cont != undefined && a.cont.type == ObjectTypeType.goblin);
             if (toattack.length > 0) {
-                console.log('No move, attack2');
+                // console.log('No move, attack2');
                 this.attack(toattack);
                 return true;
             }
@@ -421,7 +480,7 @@ class ObjectType {
     move(): void {
         if (this.type == ObjectTypeType.wall) return;
         if (this.moved == true) {
-            console.log('Already moved');
+            // console.log('Already moved');
             return;
         }
 
@@ -430,8 +489,8 @@ class ObjectType {
 
         // if attack do not move
         if (this.tryToAttack(posiblemoves)) {
-            console.log('Attacked so no move.');
-            this.print();
+            //console.log('Attacked so no move.');
+            //this.print();
             this.moved = true;
         }
 
@@ -439,10 +498,14 @@ class ObjectType {
         if (!this.moved) {
             this.moved = true;
             let others: ObjectType[];
-            if (this.type == ObjectTypeType.goblin)
+
+            if (this.type == ObjectTypeType.goblin) {
                 others = this.te.table.getAllElfs();
-            else if (this.type == ObjectTypeType.elf)
+            }
+            else if (this.type == ObjectTypeType.elf){
                 others = this.te.table.getAllGoblins();
+            }
+
 
             let te = new Array<TableElement>();
             for (let o of others) {
@@ -450,26 +513,16 @@ class ObjectType {
                 te = te.concat(tetmp);
             }
 
-            console.log('Locations to go');
-            console.log(te);
-
             // TODO remove duplicated
             te = te.filter(function(e, i, self) {
                 return (i == self.indexOf(e));
             });
-
-            // remove ocupied
-            te = te.filter(a => a.cont == undefined)
-
-            // filter out those which are not recable
-            // TODO not rechables
 
             // no movements found
             if (te.length == 0) return;
 
             // order by distance
             te = te.sort((a,b) => a.distance(this.te) - b.distance(this.te));
-
 
             // get only those with the minimal distance
             if (te.length > 1) {
@@ -481,16 +534,29 @@ class ObjectType {
 
             let moveto = te[0]; 
 
+            console.log('Wants to move to ');
+            moveto.print();
+
             // remove ocupied
             posiblemoves = posiblemoves.filter(a => a.isEmpty());
 
+            console.log('Possiblemoves1:');
+            console.log(posiblemoves.map(a=>a.print()));
+
             // order by distance
             posiblemoves = posiblemoves.sort((a, b) => a.distance(moveto) - b.distance(moveto));
+            posiblemoves = posiblemoves.sort((a, b) => a.dist.distance - b.dist.distance);
+            
+            console.log('Possiblemoves:');
+            console.log(posiblemoves.map(a=>a.print()));
             
             // get only those with the minimal distance
             if (posiblemoves.length > 1) {
-                posiblemoves = posiblemoves.filter(a => a.distance(moveto) <= posiblemoves[0].distance(moveto));
+                posiblemoves = posiblemoves.filter(a => a.dist.distance <= posiblemoves[0].dist.distance);
             }
+
+            console.log('Possiblemoves after sort:');
+            console.log(posiblemoves.map(a=>a.print()));
 
             //console.log(posiblemoves);
 
@@ -498,8 +564,12 @@ class ObjectType {
             posiblemoves = posiblemoves.sort((a,b) => a.getReadingOrder() - b.getReadingOrder());
 
             let movedir = posiblemoves[0];
-            //moveto.print();
-            //movedir.print();
+            console.log('Movement');
+            this.print();
+            console.log('move to');
+            moveto.print();
+            console.log('move dir');
+            movedir.print();
 
             if (movedir != undefined) {
                 this.te.cont = undefined;
@@ -582,7 +652,7 @@ class Wall extends ObjectType {
 
 function execute(data: string[]) {
     let table = new Table(data);
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 1000; i++) {
         console.log('State after ' + i + ' moves.');
         table.display();
         table.move();
