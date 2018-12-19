@@ -1,16 +1,23 @@
 import { data } from "./data";
 import { dataTest } from "./data";
-import { prog } from "./data";
 
 class Cpu {
-    reg: number[]
+    reg: number[];
+    regip: number;
+    program: Program;
 
-    constructor() {
-        this.reg = new Array<number>(4);
+
+    constructor(ip: number) {
+        this.reg = new Array<number>(6);
+        for (let i = 0; i < this.reg.length;i++) {
+            this.reg[i] = 0;
+        }
+        this.reg[0] = 1;
+        this.regip = ip;
     }
 
     getInstr(i: number): string {
-        return 'addr';
+        throw('error');
     }
     
     execute_number(i: number, i1: number, i2: number, o: number) {
@@ -107,108 +114,138 @@ class Cpu {
         return true;
     }
 
+    executeprogram(p: Program) {
+        this.program = p;
+        while(this.program.inRange(this.reg[this.regip])) {
+            let tmp = this.program.getInstruction(this.reg[this.regip]).split(' ');
+            this.display(tmp.join(' '));
+            this.execute(tmp[0], Number(tmp[1]), Number(tmp[2]), Number(tmp[3]));
+            // increment ip
+            this.reg[this.regip]++;
+        }
+    }
+
+    display(s: string) {
+        let tmp = new Array<number>();
+        tmp.push(this.reg[0]);
+        tmp.push(this.reg[2]);
+        tmp.push(this.reg[3]);
+        tmp.push(this.reg[5]);
+
+        console.log('IP: ' + this.reg[this.regip] + ' R[' + tmp.join(',') + '] ' + s);
+
+    }
+
     
 
 }
 
-function execute(data: string[], prog: string[]) {
-    let cpu = new Cpu();
-    let pos = [ ['addr', 'addi', 'mulr', 'muli', 'banr', 'bani', 'borr', 'bori', 'setr', 'seti', 'gtir', 'gtri', 'gtrr', 'eqir', 'eqri', 'eqrr'], // 0
-                ['addr', 'addi', 'mulr', 'muli', 'banr', 'bani', 'borr', 'bori', 'setr', 'seti', 'gtir', 'gtri', 'gtrr', 'eqir', 'eqri', 'eqrr'], // 1
-                ['addr', 'addi', 'mulr', 'muli', 'banr', 'bani', 'borr', 'bori', 'setr', 'seti', 'gtir', 'gtri', 'gtrr', 'eqir', 'eqri', 'eqrr'], // 2
-                ['addr', 'addi', 'mulr', 'muli', 'banr', 'bani', 'borr', 'bori', 'setr', 'seti', 'gtir', 'gtri', 'gtrr', 'eqir', 'eqri', 'eqrr'], // 3
-                ['addr', 'addi', 'mulr', 'muli', 'banr', 'bani', 'borr', 'bori', 'setr', 'seti', 'gtir', 'gtri', 'gtrr', 'eqir', 'eqri', 'eqrr'], // 4
-                ['addr', 'addi', 'mulr', 'muli', 'banr', 'bani', 'borr', 'bori', 'setr', 'seti', 'gtir', 'gtri', 'gtrr', 'eqir', 'eqri', 'eqrr'], // 5
-                ['addr', 'addi', 'mulr', 'muli', 'banr', 'bani', 'borr', 'bori', 'setr', 'seti', 'gtir', 'gtri', 'gtrr', 'eqir', 'eqri', 'eqrr'], // 6
-                ['addr', 'addi', 'mulr', 'muli', 'banr', 'bani', 'borr', 'bori', 'setr', 'seti', 'gtir', 'gtri', 'gtrr', 'eqir', 'eqri', 'eqrr'], // 7
-                ['addr', 'addi', 'mulr', 'muli', 'banr', 'bani', 'borr', 'bori', 'setr', 'seti', 'gtir', 'gtri', 'gtrr', 'eqir', 'eqri', 'eqrr'], // 8
-                ['addr', 'addi', 'mulr', 'muli', 'banr', 'bani', 'borr', 'bori', 'setr', 'seti', 'gtir', 'gtri', 'gtrr', 'eqir', 'eqri', 'eqrr'], // 9
-                ['addr', 'addi', 'mulr', 'muli', 'banr', 'bani', 'borr', 'bori', 'setr', 'seti', 'gtir', 'gtri', 'gtrr', 'eqir', 'eqri', 'eqrr'], // 10
-                ['addr', 'addi', 'mulr', 'muli', 'banr', 'bani', 'borr', 'bori', 'setr', 'seti', 'gtir', 'gtri', 'gtrr', 'eqir', 'eqri', 'eqrr'], // 11
-                ['addr', 'addi', 'mulr', 'muli', 'banr', 'bani', 'borr', 'bori', 'setr', 'seti', 'gtir', 'gtri', 'gtrr', 'eqir', 'eqri', 'eqrr'], // 12
-                ['addr', 'addi', 'mulr', 'muli', 'banr', 'bani', 'borr', 'bori', 'setr', 'seti', 'gtir', 'gtri', 'gtrr', 'eqir', 'eqri', 'eqrr'], // 13
-                ['addr', 'addi', 'mulr', 'muli', 'banr', 'bani', 'borr', 'bori', 'setr', 'seti', 'gtir', 'gtri', 'gtrr', 'eqir', 'eqri', 'eqrr'], // 14
-                ['addr', 'addi', 'mulr', 'muli', 'banr', 'bani', 'borr', 'bori', 'setr', 'seti', 'gtir', 'gtri', 'gtrr', 'eqir', 'eqri', 'eqrr'], // 15
-            ];
-    pos = [ [ 'bori' ],
-    [ 'borr' ],
-    [ 'addi' ],
-    [ 'muli' ],
-    [ 'addr' ],
-    [ 'bani' ],
-    [ 'gtri' ],
-    [ 'setr' ],
-    [ 'gtrr' ],
-    [ 'seti' ],
-    [ 'eqir' ],
-    [ 'eqrr' ],
-    [ 'mulr' ],
-    [ 'eqri' ],
-    [ 'gtir' ],
-    [ 'banr' ] ];
-  
-  
+class Program {
+    program: string[]
+    cpu: Cpu;
 
-    let count = 0;
-    for(let i = 0; i < data.length; i+=4) {
-        let bef = data[i];
-        let ins = data[i+1].split(' ').map(a => Number(a));
-        let aft = data[i+2];
-
-        console.log('Processing: ' + (i/4) + ' Instruction: ' + ins[0] + ' possible instr: ');
-        console.log(pos[ins[0]]);
-        
-        let opcodecount = 0;
-        for (let i = 0; i < pos[ins[0]].length; i++) {
-            let e = pos[ins[0]][i];
-            console.log('Try ' + e);
-            cpu.load(bef);
-            cpu.execute(e, ins[1], ins[2], ins[3]);
-            if (cpu.compare(aft) == true) {
-                console.log('Possible instruction:' + e);
-                opcodecount++;
-            } else {
-                console.log('Instruction:' + e + ' is not possible.');
-                pos[ins[0]].splice(i, 1);
-                i--;
-            }
-        }
-        // pos[ins[0]].map(function (e, i, self) {
-        //     console.log('Try ' + e);
-        //     cpu.load(bef);
-        //     cpu.execute(e, ins[1], ins[2], ins[3]);
-        //     if (cpu.compare(aft) == true) {
-        //         console.log('Possible instruction:' + e);
-        //         opcodecount++;
-        //     } else {
-        //         console.log('Instruction:' + e + ' is not possible.');
-        //         pos[ins[0]].splice(i, 1);
-        //     }
-        // });
-        if (opcodecount>=3) count++;
-        if (opcodecount == 0) {
-            throw ('No opcode for this instruction');
-        }
-        console.log(pos[ins[0]]);
+    getInstruction(n: number) {
+        return this.program[n+1];
     }
 
-    console.log('Results');
-    console.log(count);;
-
-    console.log('Result2');
-    console.log(pos);
-
-    cpu.load('Before: [0, 0, 0, 0]');
-    for (let p of prog) {
-        console.log('Executing: ' + p);
-        let inst = p.split(' ');
-        cpu.execute(pos[Number(inst[0])][0], Number(inst[1]), Number(inst[2]), Number(inst[3]));
-        console.log(cpu);
+    inRange(n: number): boolean {
+        if (n+1 < this.program.length) return true;
+        //console.log('Trying to reach: ' + n);
+        return false;
     }
 
-    console.log('CPU After Run');
-    console.log(cpu);
+    constructor(data: string[]) {
+        this.program = data;
+        this.cpu = new Cpu(Number(data[0].split('ip ')[1]));
+    }
+
+    run() {
+        this.cpu.executeprogram(this);
+    }
+
 }
 
-execute(data, prog);
+function execute(data: string[]) {
+    let program = new Program(data);
+    program.run();
+}
 
+
+
+function run() {
+    let r0 = 1;
+    let r1 = 0;
+    let r2 = 0;
+    let r3 = 0;
+    let r5 = 0;
+    let r6 = 0;
+
+    //console.log('IP: 17 [' + r0 +','+r1+','+r2+','+r3+',17,'+r5+']');
+    r5 = r5 + 2;
+    //console.log('IP: 18 R[' + r0 +','+r1+','+r2+','+r3+',18,'+r5+']');
+    r5 = r5 * r5;
+    //console.log('IP: 19 R[' + r0 +','+r1+','+r2+','+r3+',19,'+r5+']');
+    r5 = 19 * r5;
+    //console.log('IP: 20 R[' + r0 +','+r1+','+r2+','+r3+',20,'+r5+']');
+    r5 = r5 * 11;
+    //console.log('IP: 21 R[' + r0 +','+r1+','+r2+','+r3+',21,'+r5+']');
+    r1 = r1 + 4;
+    //console.log('IP: 22 R[' + r0 +','+r1+','+r2+','+r3+',22,'+r5+']');
+    r1 = r1 * 22;
+    //console.log('IP: 23 R[' + r0 +','+r1+','+r2+','+r3+',23,'+r5+']');
+    r1 = r1 + 15;               // addi 1 15 1
+    //console.log('IP: 24 R[' + r0 +','+r1+','+r2+','+r3+',24,'+r5+']');
+    r5 = r5 + r1                //  addr 5 1 5
+    
+    if (r0 == 1) {
+        r1 = 27;            // setr 4 2 1
+        r1 = r1 * 28;       // mulr 1 4 1
+        r1 = r1 + 29;       // addr 4 1 1
+        r1 = 30 * r1;       // mulr 4 1 1
+        r1 = r1 * 14;       // muli 1 14 1
+        r1 = r1 * 32;       // mulr 1 4 1
+        r5 = r5 + r1;       // addr 5 1 5
+        r0 = 0;
+    }
+
+    //console.log('IP: 1 R[' + r0 +','+r1+','+r2+','+r3+',1,'+r5+']');
+    r3 = 1;
+    //console.log('IP: 2 R[' + r0 +','+r1+','+r2+','+r3+',2,'+r5+']');
+    r2 = 1;
+
+    do {
+        //console.log('IP: 3 R[' + r0 +','+r1+','+r2+','+r3+',3,'+r5+']');
+        r1 = r2 * r3;               // mulr 3 2 1
+        //console.log('IP: 4 R[' + r0 +','+r1+','+r2+','+r3+',4,'+r5+']');
+        let tmp = 'IP: 4 R[' + r0 +','+r1+','+r2+','+r3+',4,'+r5+']';
+        r1 = (r1 == r5) ? 1 : 0;    // eqrr 1 5 1
+        //console.log('IP: 5 R[' + r0 +','+r1+','+r2+','+r3+',5,'+r5+']');
+        if (r1 == 1) {              // addr 1 4 4 addi 4 1 4
+            console.log('TMP: ' + tmp);
+            console.log('IP: 7 R[' + r0 +','+r1+','+r2+','+r3+',7,'+r5+']');
+            r0 = r0 + r3;           // addr 3 0 0
+        }
+        //console.log('IP: 8 R[' + r0 +','+r1+','+r2+','+r3+',8,'+r5+']');
+        r2 = r2 + 1;                // addi 2 1 2
+
+        //console.log('IP: 9 R[' + r0 +','+r1+','+r2+','+r3+',9,'+r5+']');
+        r1 = (r2 > r5) ? 1 : 0;     // gtrr 2 5 1
+        if (r1 == 1) {              // addr 4 1 4
+            console.log('IP: 12 R[' + r0 +','+r1+','+r2+','+r3+',12,'+r5+']');
+            r3 = r3 + 1;            // addi 3 1 3
+            console.log('IP: 13 R[' + r0 +','+r1+','+r2+','+r3+',13,'+r5+']');
+            r1 = (r3 > r5) ? 1 : 0; // gtrr 3 5 1
+            //console.log('IP: 14 R[' + r0 +','+r1+','+r2+','+r3+',14,'+r5+']');
+            if (r1 == 1) {
+                console.log('IP: 16 R[' + r0 +','+r1+','+r2+','+r3+',16,'+r5+']');
+                throw('final');
+            } else {
+                ////console.log('IP: 2 R[' + r0 +','+r1+','+r2+','+r3+',2,'+r5+']');
+                r2 = 1;
+            }
+        }
+    }  while(1);
+}
+
+execute(data);
+//run();
