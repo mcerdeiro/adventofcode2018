@@ -1,5 +1,10 @@
 import { data } from "./data";
 import { dataTest } from "./data";
+import { dataTest1 } from "./data";
+import { dataTest2 } from "./data";
+import { dataTest3 } from "./data";
+import { dataTest4 } from "./data";
+import { dataTest5 } from "./data";
 
 enum ObjectTypeType {
     'elf',
@@ -117,7 +122,7 @@ class TableElement {
     dist: { distance: number, isMinimum: boolean };
 
     resetDist() {
-        this.dist.distance = 100000000000;
+        this.dist.distance = undefined;
         this.dist.isMinimum = false;
     }
 
@@ -125,8 +130,8 @@ class TableElement {
         return this.coor.x + this.coor.y * this.table.table[0].length;
     }
 
-    getEmptyNeighborsWithoutMinDist(): Array<TableElement> {
-        return this.getEmptyNeighbors().filter(a => a.dist.isMinimum == false);
+    getEmptyNeighborsWithDistanceBigger(d: number) {
+        return this.getEmptyNeighbors().filter(a => ((a.dist.distance == undefined) || (a.dist.distance > d)));
     }
 
     getEmptyNeighbors(): Array<TableElement> {
@@ -163,34 +168,26 @@ class TableElement {
         return Math.abs(this.coor.x - te.coor.x) + Math.abs(this.coor.y - te.coor.y);
     }
 
-    setDistance(distance: number, isMinimum = false, te: TableElement) {
-        if (this.dist.distance > distance) {
-            this.dist.distance = distance;
-            this.table.distanceChanged = true;
-        }
-        if (isMinimum == true) {
-            this.dist.isMinimum = isMinimum;
-        } else {
-            if (this.dist.distance == this.manhattanDistance(te)) {
-                this.dist.isMinimum = true;
-            }
-        }
+    setDistance(distance: number) {
+        this.dist.distance = distance;
 
-        let ne = this.getEmptyNeighborsWithoutMinDist().map(a => a.setDistance(distance+1, true, te));
-        
-        
+        let vecinos = this.getEmptyNeighborsWithDistanceBigger(this.dist.distance+1);
+
+        vecinos.map(a => a.setDistance(this.dist.distance+1));
     }
 
-    distance(te: TableElement): number {
+    distance() {
         this.table.resetDist();
 
-        console.log('Disntace');
-        this.print();
-        te.print();
+        this.dist.distance = 0;
 
-        te.getEmptyNeighbors().map(a => a.setDistance(1, true, te));
-        this.table.display();
-        throw('distance');
+        let vecinos = this.getEmptyNeighborsWithDistanceBigger(this.dist.distance+1);
+
+        vecinos.map(a => a.setDistance(this.dist.distance+1));
+
+        // console.log('Distance Result:');
+        // this.table.display();
+        // throw('distance');
         // let de = new DistanceTree(this, te);
         // throw('Final');
         // let dx = Math.abs(this.coor.x - te.coor.x);
@@ -287,7 +284,7 @@ class Table {
             for (let y = 0; y < this.table.length; y++) {
                 for (let x = 0; x < this.table[y].length; x++) {
                     if (this.table[y][x].cont != undefined) {
-                        if (this.table[y][x].cont.type == ObjectTypeType.elf)
+                        if (this.table[y][x].cont.type == ObjectTypeType.goblin)
                             this.goblins.push(this.table[y][x].cont);
                     }
                 }
@@ -338,7 +335,10 @@ class Table {
             for (let x = 0; x < this.table[y].length; x++) {
                 str += this.table[y][x].display();
                 if (this.table[y][x].isEmpty())
-                    dist += (this.table[y][x].dist.distance > 9) ? 9 : this.table[y][x].dist.distance;
+                    if (this.table[y][x].dist.distance == undefined)
+                        dist += '-'
+                    else
+                        dist += (this.table[y][x].dist.distance > 9) ? 9 : this.table[y][x].dist.distance;
                 else
                     dist += '#';
 
@@ -379,28 +379,34 @@ class ObjectType {
     }
 
     attack(toattack: TableElement[]): void {
-        toattack = toattack.sort((a,b) => a.cont.hitpoints - b.cont.hitpoints);
+        toattack.sort((a,b) => a.cont.hitpoints - b.cont.hitpoints);
         toattack = toattack.filter(a => a.cont.hitpoints <= toattack[0].cont.hitpoints);
-        toattack = toattack.sort(a => a.getReadingOrder());
+        toattack.sort((a,b) => a.getReadingOrder() - b.getReadingOrder());
+        // if (toattack.length>1) {
+        //     console.log(toattack);
+        //     toattack.map(a => console.log(a.cont));
+        //     throw('finisch')
+        // }
 
-        console.log('Attacker:');
-        this.print();
-        console.log('Attacked:');
-        toattack[0].cont.print();
+        // console.log('Attacker:');
+        //this.print();
+        // console.log('Attacked:');
+        // toattack[0].cont.print();
         toattack[0].cont.attacked();
     }
 
-    tryToAttack(posiblemoves: TableElement[]): boolean {
+    tryToAttack(): boolean {
+        let posiblemoves = this.te.getNeighbors();
         if (this.type == ObjectTypeType.goblin) {
-            if ((this.te.coor.x == 4) && (this.te.coor.y == 2)) {
+            // if ((this.te.coor.x == 4) && (this.te.coor.y == 2)) {
                 // console.log('Siiii');
                 // console.log(posiblemoves);
                 // console.log(posiblemoves.filter(a => a.cont != undefined && a.cont.type == ObjectTypeType.elf));
-            }
+            // }
             // console.log(posiblemoves.filter(a => a.cont != undefined && a.cont.type == ObjectTypeType.elf));
             let toattack = posiblemoves.filter(a => a.cont != undefined && a.cont.type == ObjectTypeType.elf);
             if (toattack.length > 0) {
-                console.log('No move, attack1');
+                // console.log('No move, attack1');
                 this.attack(toattack);
                 return true;
             }
@@ -409,7 +415,7 @@ class ObjectType {
         if (this.type == ObjectTypeType.elf) {
             let toattack = posiblemoves.filter(a => a.cont != undefined && a.cont.type == ObjectTypeType.goblin);
             if (toattack.length > 0) {
-                console.log('No move, attack2');
+                // console.log('No move, attack2');
                 this.attack(toattack);
                 return true;
             }
@@ -419,24 +425,28 @@ class ObjectType {
     }
 
     move(): void {
+        interface PossibleMove {move: TableElement, distance: number};
+        let possibleMove = new Array<PossibleMove>();
         if (this.type == ObjectTypeType.wall) return;
         if (this.moved == true) {
-            console.log('Already moved');
+            // console.log('Already moved');
             return;
         }
 
-        // get possible moves
-        let posiblemoves = this.te.getNeighbors();
-
         // if attack do not move
-        if (this.tryToAttack(posiblemoves)) {
-            console.log('Attacked so no move.');
-            this.print();
+        if (this.tryToAttack()) {
+            // console.log('Attacked so no move.');
+            // this.print();
             this.moved = true;
         }
 
-
         if (!this.moved) {
+            {
+                // get possible moves
+                let posiblemoves = this.te.getEmptyNeighbors();
+                posiblemoves.map(a => possibleMove.push({move: a, distance: undefined}));
+            }
+
             this.moved = true;
             let others: ObjectType[];
             if (this.type == ObjectTypeType.goblin)
@@ -450,69 +460,62 @@ class ObjectType {
                 te = te.concat(tetmp);
             }
 
-            console.log('Locations to go');
-            console.log(te);
-
-            // TODO remove duplicated
+            // remove duplicated
             te = te.filter(function(e, i, self) {
                 return (i == self.indexOf(e));
             });
 
-            // remove ocupied
-            te = te.filter(a => a.cont == undefined)
-
-            // filter out those which are not recable
-            // TODO not rechables
-
             // no movements found
             if (te.length == 0) return;
 
-            // order by distance
-            te = te.sort((a,b) => a.distance(this.te) - b.distance(this.te));
+            // console.log('Moviendo');
+            // console.log(this);
 
+            // console.log('Te: Espacio Libre de contrincantes');
+            // console.log(te);
 
-            // get only those with the minimal distance
-            if (te.length > 1) {
-                te = te.filter(a => a.distance(this.te) <= te[0].distance(this.te));
+            // console.log('PossibleMove: Posibles casilleros a moverme');
+            // possibleMove.map(a => console.log(a.move));
+
+            // calculate the best move of each position.
+            for(let checkto of te) {
+                checkto.distance();
+                for(let pm of possibleMove) {
+                    if (pm.distance == undefined)
+                    {
+                        pm.distance = pm.move.dist.distance;
+                    } else if ((pm.move.dist.distance != undefined) &&
+                              (pm.move.dist.distance < pm.distance))
+                    {
+                        pm.distance = pm.move.dist.distance;
+                    }
+                }
             }
-
-            // order by reading order
-            te = te.sort((a,b) => a.getReadingOrder() - b.getReadingOrder());
-
-            let moveto = te[0]; 
-
-            // remove ocupied
-            posiblemoves = posiblemoves.filter(a => a.isEmpty());
-
-            // order by distance
-            posiblemoves = posiblemoves.sort((a, b) => a.distance(moveto) - b.distance(moveto));
             
-            // get only those with the minimal distance
-            if (posiblemoves.length > 1) {
-                posiblemoves = posiblemoves.filter(a => a.distance(moveto) <= posiblemoves[0].distance(moveto));
-            }
-
-            //console.log(posiblemoves);
-
-            // order by reading order
-            posiblemoves = posiblemoves.sort((a,b) => a.getReadingOrder() - b.getReadingOrder());
-
-            let movedir = posiblemoves[0];
-            //moveto.print();
-            //movedir.print();
-
-            if (movedir != undefined) {
-                this.te.cont = undefined;
-                this.te = movedir;
-                movedir.cont = this;
+            possibleMove = possibleMove.filter(a => (a.distance != undefined));
+            // console.log(possibleMove);
+            if (possibleMove.length == 0) return;
+            possibleMove.sort((a,b) => a.distance - b.distance);
+            // get all with minimal distance
+            possibleMove = possibleMove.filter(a => (a.distance == possibleMove[0].distance));
+            possibleMove.sort((a,b) => a.move.getReadingOrder() - b.move.getReadingOrder());
+            // if (possibleMove.length > 1) {
+            //     console.log(possibleMove);
+            //     possibleMove.map(a=> console.log(a.move));
+            //     throw('stop');
+            // }
+            // console.log('Objeto a mover');
+            // console.log(this);
+            // console.log('Possible Moves');
+            // console.log(possibleMove);
             
-                //this.te.table.display();
-                // after move check if attack possible
-                
-                posiblemoves = this.te.getNeighbors();
-                // if attack do not move
-                this.tryToAttack(posiblemoves);
-            }
+            this.te.cont = undefined;
+            possibleMove[0].move.cont = this;
+            this.te = possibleMove[0].move;
+            
+            
+            // try to attack
+            this.tryToAttack();
         }
     }
 
@@ -582,12 +585,34 @@ class Wall extends ObjectType {
 
 function execute(data: string[]) {
     let table = new Table(data);
-    for (let i = 0; i < 50; i++) {
+    console.log('Initial State');
+    table.display();
+    let i = 0;
+    while(1) {
+        i++;
+        table.move();
         console.log('State after ' + i + ' moves.');
         table.display();
-        table.move();
+        if (table.getAllElfs().length == 0) 
+        {
+            let hp = 0;
+            let rem = table.getAllGoblins();
+            rem.map(a => hp += a.hitpoints);
+            console.log('HP: ' + hp + ' Rounds:' + i + ' Total: ' + (i*hp));
+            return
+        }
+        if (table.getAllGoblins().length == 0)
+        {
+            let hp = 0;
+            let rem = table.getAllElfs();
+            rem.map(a => hp += a.hitpoints);
+            console.log('HP: ' + hp + ' Rounds:' + i + ' Total: ' + (i*hp));
+            return
+        }
+        
+        
     }
     
 }
 
-execute(dataTest);
+execute(data);
