@@ -150,9 +150,9 @@ class TableElement {
         if (this.coor.y>0)
             tmp.push(this.table.table[this.coor.y-1][this.coor.x]);
         if (this.coor.x>0)
-            tmp.push(this.table.table[this.coor.y][this.coor.x+1]);
-        if (this.coor.x<this.table.table[this.coor.y].length-1)
             tmp.push(this.table.table[this.coor.y][this.coor.x-1]);
+        if (this.coor.x<this.table.table[this.coor.y].length-1)
+            tmp.push(this.table.table[this.coor.y][this.coor.x+1]);
         if (this.coor.y<this.table.table.length-1)
             tmp.push(this.table.table[this.coor.y+1][this.coor.x]);
 
