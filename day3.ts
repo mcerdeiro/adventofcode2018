@@ -5,6 +5,12 @@ import { dataTest2 } from "./data";
 import { dataTest3 } from "./data";
 import { dataTest4 } from "./data";
 import { dataTest5 } from "./data";
+import { dataCheck } from "./data";
+import { dataCheck2 } from "./data";
+import { example1 } from "./data";
+import { example2 } from "./data";
+import { example3 } from "./data";
+
 
 enum ObjectTypeType {
     'elf',
@@ -425,7 +431,7 @@ class ObjectType {
     }
 
     move(): void {
-        interface PossibleMove {move: TableElement, distance: number};
+        interface PossibleMove {move: TableElement, distance: number, goal: TableElement};
         let possibleMove = new Array<PossibleMove>();
         if (this.type == ObjectTypeType.wall) return;
         if (this.moved == true) {
@@ -441,12 +447,15 @@ class ObjectType {
         }
 
         if (!this.moved) {
-            {
+            if ((this.te.coor.x == 10) && (this.te.coor.y == 11)) {
+                console.log('Moving Issue:')
+                console.log(this);
+            }
+            
                 // get possible moves
                 let posiblemoves = this.te.getEmptyNeighbors();
-                posiblemoves.map(a => possibleMove.push({move: a, distance: undefined}));
-            }
-
+                // posiblemoves.map(a => possibleMove.push({move: a, distance: undefined, goal: undefined}));
+            
             this.moved = true;
             let others: ObjectType[];
             if (this.type == ObjectTypeType.goblin)
@@ -480,14 +489,17 @@ class ObjectType {
             // calculate the best move of each position.
             for(let checkto of te) {
                 checkto.distance();
-                for(let pm of possibleMove) {
-                    if (pm.distance == undefined)
-                    {
-                        pm.distance = pm.move.dist.distance;
-                    } else if ((pm.move.dist.distance != undefined) &&
-                              (pm.move.dist.distance < pm.distance))
-                    {
-                        pm.distance = pm.move.dist.distance;
+                // if ((this.te.coor.x == 10) && (this.te.coor.y == 11)) {
+                //     if ((checkto.coor.x == 10)&&(checkto.coor.y == 23)) {
+                //     this.te.table.display();
+                //     }
+                //     if ((checkto.coor.x == 12)&&(checkto.coor.y == 23)) {
+                //         this.te.table.display();
+                //     }
+                // }
+                for(let pm of posiblemoves) {
+                    if (pm.dist.distance != undefined) {
+                        possibleMove.push({move: pm, distance: pm.dist.distance, goal: checkto});
                     }
                 }
             }
@@ -498,7 +510,30 @@ class ObjectType {
             possibleMove.sort((a,b) => a.distance - b.distance);
             // get all with minimal distance
             possibleMove = possibleMove.filter(a => (a.distance == possibleMove[0].distance));
+            possibleMove.sort((a,b) => a.goal.getReadingOrder() - b.goal.getReadingOrder());
+
+            if ((this.te.coor.x == 10) && (this.te.coor.y == 11)) {
+                console.log('Possible moves Before Filter:')
+                // console.log(possibleMove);
+                possibleMove.map(a => {
+                    console.log(a.distance);
+                    console.log(a.move.coor);
+                    console.log(a.goal.coor);
+                });
+            }
+            
+            
+            possibleMove = possibleMove.filter(a => a.goal == possibleMove[0].goal);
             possibleMove.sort((a,b) => a.move.getReadingOrder() - b.move.getReadingOrder());
+
+            if ((this.te.coor.x == 10) && (this.te.coor.y == 11)) {
+                console.log('Possible moves:')
+                console.log(possibleMove);
+                possibleMove.map(a => {
+                    console.log(a.move.coor);
+                    console.log(a.goal.coor);
+                });
+            }
             // if (possibleMove.length > 1) {
             //     console.log(possibleMove);
             //     possibleMove.map(a=> console.log(a.move));
@@ -615,4 +650,4 @@ function execute(data: string[]) {
     
 }
 
-execute(data);
+execute(dataTest1);
