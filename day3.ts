@@ -398,7 +398,7 @@ class ObjectType {
         //this.print();
         // console.log('Attacked:');
         // toattack[0].cont.print();
-        toattack[0].cont.attacked();
+        toattack[0].cont.attacked(this);
     }
 
     tryToAttack(): boolean {
@@ -564,10 +564,14 @@ class ObjectType {
         console.log('Type: ' + this.getTypeString() + ' X:' + this.te.coor.x + ' Y: ' + this.te.coor.y + ' HP:' + this.hitpoints);
     }
 
-    public attacked() {
-        this.hitpoints -= 3;
-        if (this.hitpoints <= 0)
+    public attacked(attacker: ObjectType) {
+        this.hitpoints -= attacker.attackpower;
+        if (this.hitpoints <= 0) {
+            if (this.type == ObjectTypeType.elf) {
+                throw('An Elf Died');
+            }
             this.die();
+        }
     }
 
     public die() {
@@ -598,7 +602,7 @@ class Elf extends ObjectType {
         super(te);
         this.type = ObjectTypeType.elf;
         this.hitpoints = 200;
-        this.attackpower = 3;
+        this.attackpower = 18;
     }
 }
 
@@ -622,6 +626,7 @@ function execute(data: string[]) {
     let table = new Table(data);
     console.log('Initial State');
     table.display();
+
     let i = 0;
     while(1) {
         i++;
@@ -650,4 +655,4 @@ function execute(data: string[]) {
     
 }
 
-execute(dataTest1);
+execute(data);
