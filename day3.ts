@@ -5,6 +5,8 @@ class Cpu {
     reg: number[];
     regip: number;
     program: Program;
+    count: number;
+    values: number[];
 
 
     constructor(ip: number) {
@@ -12,8 +14,10 @@ class Cpu {
         for (let i = 0; i < this.reg.length;i++) {
             this.reg[i] = 0;
         }
-        this.reg[0] = 1;
+        this.reg[0] = 0;//15883666;
         this.regip = ip;
+        this.count = 0;
+        this.values = new Array<number>();
     }
 
     getInstr(i: number): string {
@@ -25,6 +29,7 @@ class Cpu {
     }
 
     execute(i: string, i1: number, i2: number, o: number) {
+        this.count++;
         switch (i) {
             case 'addr':    // 0
                 this.reg[o] = this.reg[i1] + this.reg[i2];
@@ -118,21 +123,32 @@ class Cpu {
         this.program = p;
         while(this.program.inRange(this.reg[this.regip])) {
             let tmp = this.program.getInstruction(this.reg[this.regip]).split(' ');
-            this.display(tmp.join(' '));
+            // if (this.reg[this.regip] == 28) this.display(tmp.join(' '));
+            // if (this.reg[this.regip] == 13) this.display(tmp.join(' '));
+            // this.display(tmp.join(' '));
             this.execute(tmp[0], Number(tmp[1]), Number(tmp[2]), Number(tmp[3]));
             // increment ip
             this.reg[this.regip]++;
+            if (this.reg[this.regip] == 29) {
+                this.display(tmp.join(' ') + ' Length: ' + this.values.length);
+                if (this.values.indexOf(this.reg[1]) >= 0) {
+                    throw('final'); 
+                }
+                this.values.push(this.reg[1]);
+                // throw('final');
+            }
         }
     }
 
     display(s: string) {
         let tmp = new Array<number>();
         tmp.push(this.reg[0]);
+        tmp.push(this.reg[1]);
         tmp.push(this.reg[2]);
         tmp.push(this.reg[3]);
         tmp.push(this.reg[5]);
 
-        console.log('IP: ' + this.reg[this.regip] + ' R[' + tmp.join(',') + '] ' + s);
+        console.log('Count: ' + this.count + ' IP: ' + this.reg[this.regip] + ' R[' + tmp.join(',') + '] ' + s);
 
     }
 
