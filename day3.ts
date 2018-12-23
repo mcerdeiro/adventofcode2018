@@ -1,399 +1,371 @@
 import { data } from "./data";
 import { dataTest } from "./data";
 
+const Range = 1000000;
+const Step =  100000;
+const RangeMid = {"x":22000000,"y":24000000,"z":39000000}
+
 interface Pos {
     x: number,
-    y: number
+    y: number,
+    z: number
 }
 
-enum Using {
-    tourch,
-    climbinggear,
-    nothing
+function distanceToOrigin(p: Pos): number {
+    return Math.abs(p.x) + Math.abs(p.y) + Math.abs(p.z);
 }
 
-const ChangeTime = 7;
-const MaxDinstance = 1000;
+class PrioList<T> {
+    storage: T[] = [];
+    comp: (a: T, b: T ) => number;
 
-interface Distance {
-    [Using.tourch]: number;
-    [Using.climbinggear]: number;
-    [Using.nothing]: number;
-}
-
-class PrioList {
-    elements: CaveElement[] = [];
-
-    private parentIndex(nodeIndex: number): number {
-        return Math.floor((nodeIndex - 1) / 2);
+    constructor(comp: (a: T, b: T ) => number) {
+        this.comp = comp;
     }
 
-    private siftUp(index: number): void {
-        // let str = '';
-        // this.elements.map(a => str += ' ' + a.minDistance());
-        // console.log(str);
-        let parent = index-1;
-        /// 1 3 4 7 10 6
-        while (index > 0 && (this.elements[parent].minDistance() < this.elements[index].minDistance())) {
-            let tmp = this.elements[parent];
-            this.elements[parent] = this.elements[index];
-            this.elements[index] = tmp;
+    add(e: T) {
+        this.storage.push(e);
+        let index = this.storage.length-1;
+        let parent = this.storage.length-2;
+        while (index > 0 &&  this.comp(this.storage[index], this.storage[parent]) < 0) {
+            // exchange
+            let tmp = this.storage[index];
+            this.storage[index] = this.storage[parent];
+            this.storage[parent] = tmp;
+
             index = parent;
-            parent = index - 1;
-        }
-        // str = '';
-        // this.elements.map(a => str += ' ' + a.minDistance());
-        // console.log(str);
+            parent = index-1;
+}
     }
 
-    addElement(ce: CaveElement) {
-        this.elements.push(ce);
-        // this.elements.sort((a,b)=> b.minDistance() - a.minDistance());
-        this.siftUp(this.elements.length - 1);
+    pop(): T {
+        return this.storage.pop();
     }
 
     isEmpty(): boolean {
-        if (this.elements.length == 0) return true;
+        if (this.storage.length == 0) return true;
+        return false;
+    }
+}
+
+function compare(a: Robot, b: Robot): number {
+    return a.getOverlapCount() - b.getOverlapCount();
+}
+
+class Robot {
+    static staticcount: number = 0;
+    id: Number;
+    pos: Pos;
+    r: number;
+    overlaplist: Robot[] = [];
+    overlapall: Robot[] = [];
+
+    calculateNearOrigin() {
+        let nearToOrigin: Pos[] = [];
+        for (let robot of this.overlapall) {
+            nearToOrigin.push(robot.getNearToOrigin());
+        }
+        nearToOrigin.sort((a,b) => distanceToOrigin(b) - distanceToOrigin(a));
+        // console.log('List: ' + JSON.stringify(nearToOrigin));
+        console.log('Point ' + JSON.stringify(nearToOrigin[0]) + ' Distance: ' + distanceToOrigin(nearToOrigin[0]));
+        
+        // console.log('Point ' + JSON.stringify(nearToOrigin[nearToOrigin.length-1]) + ' Distance: ' + distanceToOrigin(nearToOrigin[nearToOrigin.length-1]));
+        while(nearToOrigin.length != 0) {
+            let tmp = nearToOrigin.pop();
+            let count = 0;
+            for (let rob of this.overlapall)
+            {
+                if (rob.inRange(tmp)) {
+                    count++;
+                }
+            }
+            if (count == this.overlapall.length) {
+                console.log('This point is in all robots: ' + JSON.stringify(tmp) + ' Dist: ' + distanceToOrigin(tmp));
+            }
+        }
+    }
+
+
+
+    checkOne(): boolean {
+        let check = this.getOverlapCount();
+        let tmp = this.overlaplist.pop();
+        let count = 0;
+        for (let r of this.overlaplist) {
+            if (tmp.overlap(r)) count++;
+        }
+        if (count == this.overlaplist.length)
+            this.overlapall.push(tmp);
+
+        if (this.getOverlapCount() > check) {
+            throw('This shall not happen');
+        }
+
+        if (this.overlaplist.length == 0) return false;
+        return true;
+    }
+    
+    toString(): string {
+        let str = '';
+
+        str += 'ID: ' + this.id + ' Overlapcount: ' + this.getOverlapCount() + ' (' + this.overlapall.length + '/' + this.overlaplist.length + ') R: ' + this.r + ' POS: ' + JSON.stringify(this.pos);
+
+        return str;
+    }
+
+    getOverlapCount(): number {
+        return this.overlaplist.length + this.overlapall.length;
+    }
+
+    initOverlap(robot: Robot[]) {
+        for (let i = 0; i < robot.length; i++) {
+            if (robot[i] !== this) {
+                if (this.overlap(robot[i]))
+                    this.overlaplist.push(robot[i]);
+            }
+        }
+        this.overlapall.push(this);
+    }
+
+    toOrigin(): number {
+        return Math.abs(this.pos.x) + Math.abs(this.pos.z) + Math.abs(this.pos.y);
+    }
+
+    getNearToOrigin(): Pos {
+        let diff = {x: -this.pos.x, y: -this.pos.y, z: -this.pos.z};
+        let sum = Math.abs(diff.x) + Math.abs(diff.y) + Math.abs(diff.z);
+        let pos = {x: this.pos.x+Math.round(diff.x*this.r/sum), y: this.pos.y+Math.round(diff.y*this.r/sum), z: this.pos.z+Math.round(diff.z*this.r/sum)};
+
+        if (this.distance(pos) < this.r) {
+            if ((Math.abs(diff.x) > Math.abs(diff.y)) && (Math.abs(diff.x) > Math.abs(diff.z))) {
+                pos.x += diff.x/Math.abs(diff.x);
+            }
+            if ((Math.abs(diff.y) > Math.abs(diff.x)) && (Math.abs(diff.y) > Math.abs(diff.z))) {
+                pos.y += diff.y/Math.abs(diff.y);
+            }
+            if ((Math.abs(diff.z) > Math.abs(diff.x)) && (Math.abs(diff.z) > Math.abs(diff.y))) {
+                pos.z += diff.z/Math.abs(diff.z);
+            }            
+        } else if (this.distance(pos) > this.r) {
+            if ((Math.abs(diff.x) > Math.abs(diff.y)) && (Math.abs(diff.x) > Math.abs(diff.z))) {
+                pos.x -= diff.x/Math.abs(diff.x);
+            }
+            if ((Math.abs(diff.y) > Math.abs(diff.x)) && (Math.abs(diff.y) > Math.abs(diff.z))) {
+                pos.y -= diff.y/Math.abs(diff.y);
+            }
+            if ((Math.abs(diff.z) > Math.abs(diff.x)) && (Math.abs(diff.z) > Math.abs(diff.y))) {
+                pos.z -= diff.z/Math.abs(diff.z);
+            }
+        }
+        
+        /// only for check
+        if (this.distance(pos) != this.r) {
+            console.log('*************** Problem2 ***************');
+            throw('Shall be at distance ');
+        }
+
+        return pos;
+    }
+
+    overlap(rob: Robot): boolean {
+        let robsmallr: Robot = rob;
+        let robbigr: Robot = this;
+        
+        if (rob.r > this.r) {
+            robsmallr = this;
+            robbigr = rob;
+        }
+
+        let r = robsmallr.r;
+        let diff = {x: -robsmallr.pos.x+robbigr.pos.x, y: -robsmallr.pos.y+robbigr.pos.y, z: -robsmallr.pos.z+robbigr.pos.z};
+        let sum = Math.abs(diff.x) + Math.abs(diff.y) + Math.abs(diff.z);
+        let p = {x: robsmallr.pos.x + Math.round(diff.x*r/sum), y: robsmallr.pos.y+Math.round(diff.y*r/sum), z: robsmallr.pos.z+Math.round(diff.z*r/sum)};
+        if (robsmallr.distance(p) < robsmallr.r) {
+            // console.log('Diff: ' + Math.abs(robsmallr.distance(p) - robsmallr.r));
+            // console.log(p);
+            if ((Math.abs(diff.x) > Math.abs(diff.y)) && (Math.abs(diff.x) > Math.abs(diff.z))) {
+                p.x += diff.x/Math.abs(diff.x);
+            }
+            if ((Math.abs(diff.y) > Math.abs(diff.x)) && (Math.abs(diff.y) > Math.abs(diff.z))) {
+                p.y += diff.y/Math.abs(diff.y);
+            }
+            if ((Math.abs(diff.z) > Math.abs(diff.x)) && (Math.abs(diff.z) > Math.abs(diff.y))) {
+                p.z += diff.z/Math.abs(diff.z);
+            }
+            // console.log('Diff: ' + Math.abs(robsmallr.distance(p) - robsmallr.r));
+            // console.log(p);
+        } else if (robsmallr.distance(p) > robsmallr.r) {
+            // console.log('Diff: ' + Math.abs(robsmallr.distance(p) - robsmallr.r));
+            // console.log(p);
+            if ((Math.abs(diff.x) > Math.abs(diff.y)) && (Math.abs(diff.x) > Math.abs(diff.z))) {
+                p.x -= diff.x/Math.abs(diff.x);
+            }
+            if ((Math.abs(diff.y) > Math.abs(diff.x)) && (Math.abs(diff.y) > Math.abs(diff.z))) {
+                p.y -= diff.y/Math.abs(diff.y);
+            }
+            if ((Math.abs(diff.z) > Math.abs(diff.x)) && (Math.abs(diff.z) > Math.abs(diff.y))) {
+                p.z -= diff.z/Math.abs(diff.z);
+            }
+            // console.log('Diff: ' + Math.abs(robsmallr.distance(p) - robsmallr.r));
+            // console.log(p);
+        }
+        
+
+        
+        /// only for check
+        if (robsmallr.distance(p) != robsmallr.r) {
+            console.log('*************** Problem ***************');
+            console.log('Robot small: ' + JSON.stringify(robsmallr.pos) + ' R: ' + robsmallr.r);
+            console.log('Robot big: ' + JSON.stringify(robbigr.pos) + ' R: ' + robbigr.r);
+            console.log('Difs: ' + JSON.stringify(diff) + ' Sum: ' + sum);
+            console.log('Prop x: ' + Math.round(diff.x/sum*100) + ' y:' + Math.round(diff.y/sum*100) + ' z: ' + Math.round(diff.z/sum*100));
+            console.log('Point: ' + JSON.stringify(p) + ' Overlap: ' + robbigr.inRange(p));
+            console.log('WithComa: ' + JSON.stringify({x: robsmallr.pos.x + (diff.x*r/sum), y: robsmallr.pos.y+(diff.y*r/sum), z: robsmallr.pos.z+(diff.z*r/sum)}));
+            throw('Shall be at distance ' + robsmallr.r + ' but distance is ' + robsmallr.distance(p));
+        }
+
+        // console.log('Robot small: ' + JSON.stringify(robsmallr.pos) + ' ' + robsmallr.r + ' Big: ' +
+        //     JSON.stringify(robbigr.pos) + ' ' + robbigr.r + ' P: ' + JSON.stringify(p) + ' Overlap: ' + robbigr.inRange(p));
+
+        if (robbigr.inRange(p)) return true;
+
         return false;
     }
 
-    pop(): CaveElement {
-        // let str = 'Pop: ';
-        // this.elements.map(a => str += ' ' + a.minDistance());
-        // console.log(str);
-        // console.log('Pop: ' + this.elements.length);
-        let tmp = this.elements.pop();
-        // console.log('Pop2: ' + this.elements.length);
-        // str = 'Pop2: ';
-        // this.elements.map(a => str += ' ' + a.minDistance());
-        // console.log(str);
+    constructor(p: Pos, r: number) {
+        this.pos = p;
+        this.r = r;
+        this.id = Robot.staticcount;
+        Robot.staticcount++;
 
-        return tmp;
+        // console.log('New Robot with: ' + this.r + ' ' + JSON.stringify(this.pos));
     }
+
+    distance(r: Robot | Pos): number {
+        if (r instanceof Robot)
+            return Math.abs(r.pos.x - this.pos.x) + Math.abs(r.pos.z - this.pos.z) + Math.abs(r.pos.y - this.pos.y);
+        else 
+            return Math.abs(r.x - this.pos.x) + Math.abs(r.z - this.pos.z) + Math.abs(r.y - this.pos.y);
+    }
+
+    inRange(r: Pos | Robot): boolean {
+        if (this.distance(r) <= this.r) {
+            return true;
+        }
+
+        return false;
+    }
+
 }
 
-class CaveElement {
-    type: string;
-    gi: number;
-    el: number;
-    distance: Distance;
-    pos: Pos;
-    cave: Cave;
+class Robots {
+    robots: Robot[] = [];
 
-    minDistance() {
-        let dist: number[] = [];
-        if (this.distance[Using.tourch] != undefined) dist.push(this.distance[Using.tourch]);
-        if (this.distance[Using.climbinggear] != undefined) dist.push(this.distance[Using.climbinggear]);
-        if (this.distance[Using.nothing] != undefined) dist.push(this.distance[Using.nothing]);
-
-        dist.sort((a,b) => a - b);
-
-        return dist[0];
-    }
-
-    constructor(p: Pos, c: Cave) {
-        this.type = ' ';
-        this.gi = undefined;
-        this.el = undefined;
-        this.distance = { [Using.nothing]: undefined, [Using.climbinggear]: undefined, [Using.tourch]: undefined };
-        this.pos = {x: p.x, y: p.y};
-        this.cave = c;
-    }
-
-    getVecinos(): Array<CaveElement> {
-        let tmp = new Array<CaveElement>();
-
-        if (this.pos.y+1 < this.cave.size.y)
-            tmp.push(this.cave.storage[this.pos.y+1][this.pos.x]);
-        if (this.pos.x+1 < this.cave.size.x)
-            tmp.push(this.cave.storage[this.pos.y][this.pos.x+1]);
-        if (this.pos.x > 0)
-            tmp.push(this.cave.storage[this.pos.y][this.pos.x-1]);
-        if (this.pos.y > 0)
-            tmp.push(this.cave.storage[this.pos.y-1][this.pos.x]);
-
-        return tmp;
-    }
-
-    canCarry(u: Using): boolean {
-        switch (this.type) {
-            case '.':
-            case 'M':
-            case 'T':
-                if (u == Using.climbinggear) return true;
-                if (u == Using.tourch) return true;
-                if (u == Using.nothing) return false;
-                break;
-            case '=':
-                if (u == Using.climbinggear) return true;
-                if (u == Using.tourch) return false;
-                if (u == Using.nothing) return true;
-                break;
-            case '|':
-                if (u == Using.climbinggear) return false;
-                if (u == Using.tourch) return true;
-                if (u == Using.nothing) return true;
-                break;
+    constructor(data: string[]) {
+        for(let line of data) {
+            // console.log('Processing line: ' + line);
+            this.robots.push(this.createRobot(line));
         }
-
-        throw ('Something wents wrong');
     }
 
-    getListOfCarry(): Using[]  {
-        let ret = new Array<Using>();
-        switch (this.type) {
-            case 'M':
-            case 'T':
-            case '.':
-                // rock
-                ret.push(Using.climbinggear);
-                ret.push(Using.tourch);
-                break;
-            case '=':
-                // wet
-                ret.push(Using.climbinggear);
-                ret.push(Using.nothing);
-                break;
-            case '|':
-                // narrow
-                ret.push(Using.tourch);
-                ret.push(Using.nothing);
-                break;
-            default:
-                throw('Something went wrong');
-        }
-        return ret;
+    createRobot(line: string) {
+        let r = Number(line.split('>, r=')[1]);
+        let x = Number(line.split('>, r=')[0].split('os=<')[1].split(',')[0]);
+        let y = Number(line.split('>, r=')[0].split('os=<')[1].split(',')[1]);
+        let z = Number(line.split('>, r=')[0].split('os=<')[1].split(',')[2]);
+    
+        return new Robot({x: x, y:y,z:z}, r);
     }
 
-    getToolToMove(to: CaveElement): Using[] {
-        let ccs = this.getListOfCarry();
-        let ret = new Array<Using>();
+    getMaxR(): Robot {
+        // console.log('Robots: ' + JSON.stringify(this.robots));
+        let ret = this.robots[0];
 
-        for (let cc  of ccs) {
-            if (to.canCarry(cc) == true) ret.push(cc);
-        }
+        this.robots.map((a) => {
+            if (a.r > ret.r) 
+                ret = a;
+         });
 
         return ret;
     }
 
-    setDistance(d: Distance): boolean {
-        let ccs = this.getListOfCarry();
-        let cont = false;
-        let minimal = 1000000000000000000000;
-        for (let cc of ccs) {
-            if (d[cc] != undefined) {
-                if (this.distance[cc] == undefined) {
-                    this.distance[cc] = d[cc];
-                    cont = true;
-                    if (minimal > d[cc]) {
-                        minimal = d[cc];
-                    }
-                } else if (d[cc] < this.distance[cc]) {
-                    this.distance[cc] = d[cc];
-                    if (minimal > d[cc]) {
-                        minimal = d[cc];
-                    }
-                    cont = true;
-                }
-            }
-        }
+    getInRange(r: Robot): Robot[] {
+        let robots = Array<Robot>();
+        this.robots.map(a => {
+            if (r.inRange(a) == true)
+                robots.push(a)
+        });
 
-        for (let cc of ccs) {
-            if (this.distance[cc] == undefined) {
-                this.distance[cc] = minimal+ChangeTime;
-            }
-        }
+        return robots;
 
-        // if ((this.pos.x == 1) && (this.pos.y == 1)) {
-        //     console.log(this.distance);
-        //     throw('Final');
-        // }
-
-        if (this.distance[ccs[0]] > this.distance[ccs[1]]+ChangeTime) {
-            this.distance[ccs[0]] = this.distance[ccs[1]]+ChangeTime;
-            cont = true;
-        }
-            
-        if (this.distance[ccs[1]] > this.distance[ccs[0]]+ChangeTime) {
-            this.distance[ccs[1]] = this.distance[ccs[0]]+ChangeTime;
-            cont = true;
-        }
-
-        return cont;
     }
 
-    calculateDistance(d: Distance, t: CaveElement) {
-        let prioList = new PrioList();
-        this.setDistance(d);
-        prioList.addElement(this);
+    getInTarget(p: Pos): Robot[] {
+        let robots = Array<Robot>();
+        this.robots.map(a => {
+            if (a.inRange(p) == true)
+                robots.push(a)
+        });
 
+        return robots;
+    }
+
+    calculate(): Robot {
+        this.robots.sort((a,b) => b.r - a.r);
+        let prioList = new PrioList<Robot>(compare);
+
+        for (let i = 0; i < this.robots.length; i++) {
+            this.robots[i].initOverlap(this.robots);
+            prioList.add(this.robots[i]);
+        }
+
+        let last: Robot = undefined;
         while(!prioList.isEmpty()) {
-            // console.log(prioList.elements);
-            let element = prioList.pop();
-            if (element === t) return;
-            // console.log('Pos: ' + JSON.stringify(element.pos) + ' Distance: ' + JSON.stringify(element.distance));
+            let tmp = prioList.pop();
+            if ((last != undefined) && (last.getOverlapCount() >= tmp.getOverlapCount())) {
+                // we found what we search for
+                return last;
+            }
+            // console.log('PrioList: ' + prioList.storage.length + ' Checking: ' + tmp.toString());
+            if (tmp.checkOne()) {
+                prioList.add(tmp);
+            } else {
+                last = tmp;
+            }
+            // console.log('PrioList: ' + prioList.storage.length + ' Checking: ' + tmp.toString());
             
-
-            let vecinos = element.getVecinos();
-            for (let v of vecinos) {
-                let toolstomovewith = element.getToolToMove(v);
-                let newDistance = { [Using.climbinggear]: undefined, [Using.nothing]: undefined, [Using.tourch]: undefined};
-                for (let ttmw of toolstomovewith) {
-                    newDistance[ttmw] = element.distance[ttmw]+1;
-                }
-                if (v.setDistance(newDistance))
-                    prioList.addElement(v);
-            }
         }
 
-        // if (this.type == '=') {
-        //     console.log(d);
-        //     console.log(this.pos);
-        //     console.log(this.distance);
-        // }
-        
-
-        // if (minimal > MaxDinstance) cont = false;
-        // if (cont == false) return;
-
-        // let vecinos = this.getVecinos();
-
-        // for (let v of vecinos) {
-        //     let toolstomovewith = this.getToolToMove(v);
-        //     let newDistance = { [Using.climbinggear]: undefined, [Using.nothing]: undefined, [Using.tourch]: undefined};
-        //     for (let ttmw of toolstomovewith) {
-        //         newDistance[ttmw] = this.distance[ttmw]+1;
-        //     }
-        //     v.calculateDistance(newDistance);
+        // for (let i = 0; i < this.robots.length; i++) {
+        //     this.robots.sort((a,b) => - a.getOverlapCount() + b.getOverlapCount());
+        //     console.log('Robot : ' + i + ' overlaps with ' + this.robots[i].getOverlapCount());
+        //     this.robots = this.robots.filter(a => a)
         // }
     }
+
+    
 }
 
-class Cave {
-    depth: number;
-    target: Pos;
-    size: Pos;
-    storage: CaveElement[][];
-
-    constructor(d: number, t: Pos) {
-        this.depth = d;
-        this.size = {x: t.x+25, y: t.y+25};
-        this.target = {x: t.x, y: t.y};
-
-        this.storage = new Array<CaveElement[]>();
-        for(let y = 0; y < this.size.y; y++) {
-            let tmp = new Array<CaveElement>();
-            for(let x = 0; x < this.size.x; x++) {
-                tmp.push(new CaveElement({x: x, y:y}, this));
-            }
-            this.storage.push(tmp);
-        }
-    }
-
-    display() {
-        for(let y = 0; y < this.size.y; y++) {
-            let str = '';
-            let dist = '';
-            for(let x = 0; x < this.size.x; x++) {
-                str += this.storage[y][x].type;
-                if (x < 17) {
-                    dist += (this.storage[y][x].distance[Using.tourch] == undefined) ? './' : this.storage[y][x].distance[Using.tourch] + '/';
-                    dist += (this.storage[y][x].distance[Using.climbinggear] == undefined) ? './' : this.storage[y][x].distance[Using.climbinggear] + '/';
-                    dist += (this.storage[y][x].distance[Using.nothing] == undefined) ? '.-' : this.storage[y][x].distance[Using.nothing] + '-';
-                }
-            }
-            console.log(str + '     ' + dist);
-        }
-    }
-
-
-
-    build() {
-        this.storage[0][0].gi = 0;
-        this.storage[0][0].el = ( this.storage[0][0].gi + this.depth ) % 20183;
-        for (let y = 1; y < this.size.y; y++) {
-            this.storage[y][0].gi = y * 48271;
-            this.storage[y][0].el = ( this.storage[y][0].gi + this.depth ) % 20183;
-        }
-        for (let x = 1; x < this.size.x; x++) {
-            this.storage[0][x].gi = x * 16807;
-            this.storage[0][x].el = ( this.storage[0][x].gi + this.depth ) % 20183;
-        }
-        for (let y = 1; y < this.size.y; y++) {
-            for (let x = 1; x < this.size.x; x++) {
-                if ( (x == this.target.y) && (y == this.target.y) ) {
-                    this.storage[y][x].gi = 0;
-                    this.storage[y][x].el = ( this.storage[y][x].gi + this.depth ) % 20183;
-                } else {
-                    if ((this.storage[y][x-1].el == undefined) || (this.storage[y-1][x].el == undefined)) {
-                        throw('Undefined el if parent');
-                    }
-                    this.storage[y][x].gi = this.storage[y][x-1].el * this.storage[y-1][x].el;
-                    this.storage[y][x].el = ( this.storage[y][x].gi + this.depth ) % 20183;
-                }
-            }
-        }
-        for (let y = 0; y < this.size.y; y++) {
-            for (let x = 0; x < this.size.x; x++) {
-                if (this.storage[y][x].el == undefined)
-                    throw('el not defined');
-                if (this.storage[y][x].gi == undefined)
-                    throw('gi not defined');
-
-                switch (this.storage[y][x].el % 3) {
-                    case 0: this.storage[y][x].type = '.';
-                        break;
-                    case 1: this.storage[y][x].type = '=';
-                        break;
-                    case 2: this.storage[y][x].type = '|';
-                        break;
-                }
-            }
-        }
-
-        this.storage[0][0].type = 'M';
-        this.storage[this.target.y][this.target.x].type = 'T';
-    }
-
-    risk() {
-        let risk = 0;
-        for (let y = 0; y <= this.target.y; y++) {
-            for (let x = 0; x <= this.target.x; x++) {
-                switch (this.storage[y][x].type) {
-                    case '.':
-                        break;
-                    case '=':
-                        risk += 1;
-                        break;
-                    case '|':
-                        risk += 2;
-                        break;
-                    case 'M':
-                        break;
-                    case 'T':
-                        break;
-                    default:
-                        throw ('unkown type');
-
-                }
-            }
-        }
-        console.log('Risk: ' + risk);
-    }
+function toOrigin(pos:Pos): number {
+    return Math.abs(pos.x) + Math.abs(pos.z) + Math.abs(pos.y);
 }
 
-function execute(d: number, t: Pos) {
-    let cave = new Cave(d, t);
-    cave.build();
-    cave.display();
-    cave.risk();
 
-    cave.storage[0][0].calculateDistance({[Using.tourch]: 0, [Using.climbinggear]: ChangeTime, [Using.nothing]: undefined}, cave.storage[cave.target.y][cave.target.x]);
-    console.log('Distance: ');
-    cave.display();
-    console.log(JSON.stringify(cave.storage[cave.target.y][cave.target.x].distance));
+function execute(data: string[]) {
+    let robots = new Robots(data);
+
+    console.log('Robot with more radius: ' + JSON.stringify(robots.getMaxR()));
+    let inRange = robots.getInRange(robots.getMaxR());
+
+    console.log('Count of Robots: ' + robots.robots.length);
+    console.log('Robots in Range: ' +  inRange.length);
+
+    let max = robots.calculate();
+
+    console.log('Overlap all: \n' + max.toString());
+
+    max.calculateNearOrigin();
+
 }
 
-//execute(510, {x: 10, y: 10});
-execute(6084, {x: 14, y: 709});
-//run();
+execute(data);
