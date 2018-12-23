@@ -1,267 +1,399 @@
 import { data } from "./data";
 import { dataTest } from "./data";
 
-class Cpu {
-    reg: number[];
-    regip: number;
-    program: Program;
-    count: number;
-    values: number[];
-
-
-    constructor(ip: number) {
-        this.reg = new Array<number>(6);
-        for (let i = 0; i < this.reg.length;i++) {
-            this.reg[i] = 0;
-        }
-        this.reg[0] = 0;//15883666;
-        this.regip = ip;
-        this.count = 0;
-        this.values = new Array<number>();
-    }
-
-    getInstr(i: number): string {
-        throw('error');
-    }
-    
-    execute_number(i: number, i1: number, i2: number, o: number) {
-       this.execute(this.getInstr(i), i1, i2, o);
-    }
-
-    execute(i: string, i1: number, i2: number, o: number) {
-        this.count++;
-        switch (i) {
-            case 'addr':    // 0
-                this.reg[o] = this.reg[i1] + this.reg[i2];
-                break;
-            case 'addi':    // 1
-                this.reg[o] = this.reg[i1] + i2;
-                break;
-            case  'mulr':   // 2
-                this.reg[o] = this.reg[i1] * this.reg[i2];
-                break;
-            case 'muli':    // 3
-                this.reg[o] = this.reg[i1] * i2;
-                break;
-            case 'banr':    // 4
-                this.reg[o] = this.reg[i1] & this.reg[i2];
-                break;
-            case 'bani':    // 5
-                this.reg[o] = this.reg[i1] & i2;
-                break;
-            case 'borr':    // 6
-                this.reg[o] = this.reg[i1] | this.reg[i2];
-                break;
-            case 'bori':    // 7
-                this.reg[o] = this.reg[i1] | i2;
-                break;
-            case 'setr':    // 8
-                this.reg[o] = this.reg[i1];
-                break;
-            case 'seti':    // 9
-                this.reg[o] = i1;
-                break;
-            case 'gtir':    // 10
-                this.reg[o] = (i1 > this.reg[i2]) ? 1 : 0;
-                break;
-            case 'gtri':    // 11
-                this.reg[o] = (this.reg[i1] > i2) ? 1 : 0
-                break;
-            case 'gtrr':    // 12
-                this.reg[o] = (this.reg[i1] > this.reg[i2]) ? 1 : 0;
-                break;
-            case 'eqir':    // 13
-                this.reg[o] = (i1 == this.reg[i2]) ? 1 : 0;
-                break;
-            case 'eqri':    // 14
-                this.reg[o] = (this.reg[i1] == i2) ? 1 : 0;
-                break;
-            case 'eqrr':    // 15
-                this.reg[o] = (this.reg[i1] == this.reg[i2]) ? 1 : 0;
-                break;
-            default:
-                throw('Not know instruction');
-
-        }
-    }
-
-    instruction(i: string) {
-        let inst = i.split(' ');    
-        this.execute_number(Number(inst[0]), Number(inst[1]), Number(inst[2]), Number(inst[3]));
-    }
-
-    set(reg: number[]) {
-        this.reg[0] = reg[0];
-        this.reg[1] = reg[1];
-        this.reg[2] = reg[2];
-        this.reg[3] = reg[3];
-    }
-
-    load(line: string) {
-        let tmp1 = line.split('efore: [')[1];
-        let tmp2 = tmp1.split(']')[0];
-        let tmp3 = tmp2.split(',');
-        this.reg[0] = Number(tmp3[0]);
-        this.reg[1] = Number(tmp3[1]);
-        this.reg[2] = Number(tmp3[2]);
-        this.reg[3] = Number(tmp3[3]);
-    }
-
-    compare(line: string): boolean {
-        let tmp1 = line.split('fter:  [')[1];
-        let tmp2 = tmp1.split(']')[0];
-        let tmp3 = tmp2.split(',');
-        if (this.reg[0] != Number(tmp3[0])) return false;
-        if (this.reg[1] != Number(tmp3[1])) return false;
-        if (this.reg[2] != Number(tmp3[2])) return false;
-        if (this.reg[3] != Number(tmp3[3])) return false;
-
-        return true;
-    }
-
-    executeprogram(p: Program) {
-        this.program = p;
-        while(this.program.inRange(this.reg[this.regip])) {
-            let tmp = this.program.getInstruction(this.reg[this.regip]).split(' ');
-            // if (this.reg[this.regip] == 28) this.display(tmp.join(' '));
-            // if (this.reg[this.regip] == 13) this.display(tmp.join(' '));
-            // this.display(tmp.join(' '));
-            this.execute(tmp[0], Number(tmp[1]), Number(tmp[2]), Number(tmp[3]));
-            // increment ip
-            this.reg[this.regip]++;
-            if (this.reg[this.regip] == 29) {
-                this.display(tmp.join(' ') + ' Length: ' + this.values.length);
-                if (this.values.indexOf(this.reg[1]) >= 0) {
-                    throw('final'); 
-                }
-                this.values.push(this.reg[1]);
-                // throw('final');
-            }
-        }
-    }
-
-    display(s: string) {
-        let tmp = new Array<number>();
-        tmp.push(this.reg[0]);
-        tmp.push(this.reg[1]);
-        tmp.push(this.reg[2]);
-        tmp.push(this.reg[3]);
-        tmp.push(this.reg[5]);
-
-        console.log('Count: ' + this.count + ' IP: ' + this.reg[this.regip] + ' R[' + tmp.join(',') + '] ' + s);
-
-    }
-
-    
-
+interface Pos {
+    x: number,
+    y: number
 }
 
-class Program {
-    program: string[]
-    cpu: Cpu;
+enum Using {
+    tourch,
+    climbinggear,
+    nothing
+}
 
-    getInstruction(n: number) {
-        return this.program[n+1];
+const ChangeTime = 7;
+const MaxDinstance = 1000;
+
+interface Distance {
+    [Using.tourch]: number;
+    [Using.climbinggear]: number;
+    [Using.nothing]: number;
+}
+
+class PrioList {
+    elements: CaveElement[] = [];
+
+    private parentIndex(nodeIndex: number): number {
+        return Math.floor((nodeIndex - 1) / 2);
     }
 
-    inRange(n: number): boolean {
-        if (n+1 < this.program.length) return true;
-        //console.log('Trying to reach: ' + n);
+    private siftUp(index: number): void {
+        // let str = '';
+        // this.elements.map(a => str += ' ' + a.minDistance());
+        // console.log(str);
+        let parent = index-1;
+        /// 1 3 4 7 10 6
+        while (index > 0 && (this.elements[parent].minDistance() < this.elements[index].minDistance())) {
+            let tmp = this.elements[parent];
+            this.elements[parent] = this.elements[index];
+            this.elements[index] = tmp;
+            index = parent;
+            parent = index - 1;
+        }
+        // str = '';
+        // this.elements.map(a => str += ' ' + a.minDistance());
+        // console.log(str);
+    }
+
+    addElement(ce: CaveElement) {
+        this.elements.push(ce);
+        // this.elements.sort((a,b)=> b.minDistance() - a.minDistance());
+        this.siftUp(this.elements.length - 1);
+    }
+
+    isEmpty(): boolean {
+        if (this.elements.length == 0) return true;
         return false;
     }
 
-    constructor(data: string[]) {
-        this.program = data;
-        this.cpu = new Cpu(Number(data[0].split('ip ')[1]));
-    }
+    pop(): CaveElement {
+        // let str = 'Pop: ';
+        // this.elements.map(a => str += ' ' + a.minDistance());
+        // console.log(str);
+        // console.log('Pop: ' + this.elements.length);
+        let tmp = this.elements.pop();
+        // console.log('Pop2: ' + this.elements.length);
+        // str = 'Pop2: ';
+        // this.elements.map(a => str += ' ' + a.minDistance());
+        // console.log(str);
 
-    run() {
-        this.cpu.executeprogram(this);
+        return tmp;
     }
-
 }
 
-function execute(data: string[]) {
-    let program = new Program(data);
-    program.run();
-}
+class CaveElement {
+    type: string;
+    gi: number;
+    el: number;
+    distance: Distance;
+    pos: Pos;
+    cave: Cave;
 
+    minDistance() {
+        let dist: number[] = [];
+        if (this.distance[Using.tourch] != undefined) dist.push(this.distance[Using.tourch]);
+        if (this.distance[Using.climbinggear] != undefined) dist.push(this.distance[Using.climbinggear]);
+        if (this.distance[Using.nothing] != undefined) dist.push(this.distance[Using.nothing]);
 
+        dist.sort((a,b) => a - b);
 
-function run() {
-    let r0 = 1;
-    let r1 = 0;
-    let r2 = 0;
-    let r3 = 0;
-    let r5 = 0;
-    let r6 = 0;
-
-    //console.log('IP: 17 [' + r0 +','+r1+','+r2+','+r3+',17,'+r5+']');
-    r5 = r5 + 2;
-    //console.log('IP: 18 R[' + r0 +','+r1+','+r2+','+r3+',18,'+r5+']');
-    r5 = r5 * r5;
-    //console.log('IP: 19 R[' + r0 +','+r1+','+r2+','+r3+',19,'+r5+']');
-    r5 = 19 * r5;
-    //console.log('IP: 20 R[' + r0 +','+r1+','+r2+','+r3+',20,'+r5+']');
-    r5 = r5 * 11;
-    //console.log('IP: 21 R[' + r0 +','+r1+','+r2+','+r3+',21,'+r5+']');
-    r1 = r1 + 4;
-    //console.log('IP: 22 R[' + r0 +','+r1+','+r2+','+r3+',22,'+r5+']');
-    r1 = r1 * 22;
-    //console.log('IP: 23 R[' + r0 +','+r1+','+r2+','+r3+',23,'+r5+']');
-    r1 = r1 + 15;               // addi 1 15 1
-    //console.log('IP: 24 R[' + r0 +','+r1+','+r2+','+r3+',24,'+r5+']');
-    r5 = r5 + r1                //  addr 5 1 5
-    
-    if (r0 == 1) {
-        r1 = 27;            // setr 4 2 1
-        r1 = r1 * 28;       // mulr 1 4 1
-        r1 = r1 + 29;       // addr 4 1 1
-        r1 = 30 * r1;       // mulr 4 1 1
-        r1 = r1 * 14;       // muli 1 14 1
-        r1 = r1 * 32;       // mulr 1 4 1
-        r5 = r5 + r1;       // addr 5 1 5
-        r0 = 0;
+        return dist[0];
     }
 
-    //console.log('IP: 1 R[' + r0 +','+r1+','+r2+','+r3+',1,'+r5+']');
-    r3 = 1;
-    //console.log('IP: 2 R[' + r0 +','+r1+','+r2+','+r3+',2,'+r5+']');
-    r2 = 1;
+    constructor(p: Pos, c: Cave) {
+        this.type = ' ';
+        this.gi = undefined;
+        this.el = undefined;
+        this.distance = { [Using.nothing]: undefined, [Using.climbinggear]: undefined, [Using.tourch]: undefined };
+        this.pos = {x: p.x, y: p.y};
+        this.cave = c;
+    }
 
-    do {
-        //console.log('IP: 3 R[' + r0 +','+r1+','+r2+','+r3+',3,'+r5+']');
-        r1 = r2 * r3;               // mulr 3 2 1
-        //console.log('IP: 4 R[' + r0 +','+r1+','+r2+','+r3+',4,'+r5+']');
-        let tmp = 'IP: 4 R[' + r0 +','+r1+','+r2+','+r3+',4,'+r5+']';
-        r1 = (r1 == r5) ? 1 : 0;    // eqrr 1 5 1
-        //console.log('IP: 5 R[' + r0 +','+r1+','+r2+','+r3+',5,'+r5+']');
-        if (r1 == 1) {              // addr 1 4 4 addi 4 1 4
-            console.log('TMP: ' + tmp);
-            console.log('IP: 7 R[' + r0 +','+r1+','+r2+','+r3+',7,'+r5+']');
-            r0 = r0 + r3;           // addr 3 0 0
+    getVecinos(): Array<CaveElement> {
+        let tmp = new Array<CaveElement>();
+
+        if (this.pos.y+1 < this.cave.size.y)
+            tmp.push(this.cave.storage[this.pos.y+1][this.pos.x]);
+        if (this.pos.x+1 < this.cave.size.x)
+            tmp.push(this.cave.storage[this.pos.y][this.pos.x+1]);
+        if (this.pos.x > 0)
+            tmp.push(this.cave.storage[this.pos.y][this.pos.x-1]);
+        if (this.pos.y > 0)
+            tmp.push(this.cave.storage[this.pos.y-1][this.pos.x]);
+
+        return tmp;
+    }
+
+    canCarry(u: Using): boolean {
+        switch (this.type) {
+            case '.':
+            case 'M':
+            case 'T':
+                if (u == Using.climbinggear) return true;
+                if (u == Using.tourch) return true;
+                if (u == Using.nothing) return false;
+                break;
+            case '=':
+                if (u == Using.climbinggear) return true;
+                if (u == Using.tourch) return false;
+                if (u == Using.nothing) return true;
+                break;
+            case '|':
+                if (u == Using.climbinggear) return false;
+                if (u == Using.tourch) return true;
+                if (u == Using.nothing) return true;
+                break;
         }
-        //console.log('IP: 8 R[' + r0 +','+r1+','+r2+','+r3+',8,'+r5+']');
-        r2 = r2 + 1;                // addi 2 1 2
 
-        //console.log('IP: 9 R[' + r0 +','+r1+','+r2+','+r3+',9,'+r5+']');
-        r1 = (r2 > r5) ? 1 : 0;     // gtrr 2 5 1
-        if (r1 == 1) {              // addr 4 1 4
-            console.log('IP: 12 R[' + r0 +','+r1+','+r2+','+r3+',12,'+r5+']');
-            r3 = r3 + 1;            // addi 3 1 3
-            console.log('IP: 13 R[' + r0 +','+r1+','+r2+','+r3+',13,'+r5+']');
-            r1 = (r3 > r5) ? 1 : 0; // gtrr 3 5 1
-            //console.log('IP: 14 R[' + r0 +','+r1+','+r2+','+r3+',14,'+r5+']');
-            if (r1 == 1) {
-                console.log('IP: 16 R[' + r0 +','+r1+','+r2+','+r3+',16,'+r5+']');
-                throw('final');
-            } else {
-                ////console.log('IP: 2 R[' + r0 +','+r1+','+r2+','+r3+',2,'+r5+']');
-                r2 = 1;
+        throw ('Something wents wrong');
+    }
+
+    getListOfCarry(): Using[]  {
+        let ret = new Array<Using>();
+        switch (this.type) {
+            case 'M':
+            case 'T':
+            case '.':
+                // rock
+                ret.push(Using.climbinggear);
+                ret.push(Using.tourch);
+                break;
+            case '=':
+                // wet
+                ret.push(Using.climbinggear);
+                ret.push(Using.nothing);
+                break;
+            case '|':
+                // narrow
+                ret.push(Using.tourch);
+                ret.push(Using.nothing);
+                break;
+            default:
+                throw('Something went wrong');
+        }
+        return ret;
+    }
+
+    getToolToMove(to: CaveElement): Using[] {
+        let ccs = this.getListOfCarry();
+        let ret = new Array<Using>();
+
+        for (let cc  of ccs) {
+            if (to.canCarry(cc) == true) ret.push(cc);
+        }
+
+        return ret;
+    }
+
+    setDistance(d: Distance): boolean {
+        let ccs = this.getListOfCarry();
+        let cont = false;
+        let minimal = 1000000000000000000000;
+        for (let cc of ccs) {
+            if (d[cc] != undefined) {
+                if (this.distance[cc] == undefined) {
+                    this.distance[cc] = d[cc];
+                    cont = true;
+                    if (minimal > d[cc]) {
+                        minimal = d[cc];
+                    }
+                } else if (d[cc] < this.distance[cc]) {
+                    this.distance[cc] = d[cc];
+                    if (minimal > d[cc]) {
+                        minimal = d[cc];
+                    }
+                    cont = true;
+                }
             }
         }
-    }  while(1);
+
+        for (let cc of ccs) {
+            if (this.distance[cc] == undefined) {
+                this.distance[cc] = minimal+ChangeTime;
+            }
+        }
+
+        // if ((this.pos.x == 1) && (this.pos.y == 1)) {
+        //     console.log(this.distance);
+        //     throw('Final');
+        // }
+
+        if (this.distance[ccs[0]] > this.distance[ccs[1]]+ChangeTime) {
+            this.distance[ccs[0]] = this.distance[ccs[1]]+ChangeTime;
+            cont = true;
+        }
+            
+        if (this.distance[ccs[1]] > this.distance[ccs[0]]+ChangeTime) {
+            this.distance[ccs[1]] = this.distance[ccs[0]]+ChangeTime;
+            cont = true;
+        }
+
+        return cont;
+    }
+
+    calculateDistance(d: Distance, t: CaveElement) {
+        let prioList = new PrioList();
+        this.setDistance(d);
+        prioList.addElement(this);
+
+        while(!prioList.isEmpty()) {
+            // console.log(prioList.elements);
+            let element = prioList.pop();
+            if (element === t) return;
+            // console.log('Pos: ' + JSON.stringify(element.pos) + ' Distance: ' + JSON.stringify(element.distance));
+            
+
+            let vecinos = element.getVecinos();
+            for (let v of vecinos) {
+                let toolstomovewith = element.getToolToMove(v);
+                let newDistance = { [Using.climbinggear]: undefined, [Using.nothing]: undefined, [Using.tourch]: undefined};
+                for (let ttmw of toolstomovewith) {
+                    newDistance[ttmw] = element.distance[ttmw]+1;
+                }
+                if (v.setDistance(newDistance))
+                    prioList.addElement(v);
+            }
+        }
+
+        // if (this.type == '=') {
+        //     console.log(d);
+        //     console.log(this.pos);
+        //     console.log(this.distance);
+        // }
+        
+
+        // if (minimal > MaxDinstance) cont = false;
+        // if (cont == false) return;
+
+        // let vecinos = this.getVecinos();
+
+        // for (let v of vecinos) {
+        //     let toolstomovewith = this.getToolToMove(v);
+        //     let newDistance = { [Using.climbinggear]: undefined, [Using.nothing]: undefined, [Using.tourch]: undefined};
+        //     for (let ttmw of toolstomovewith) {
+        //         newDistance[ttmw] = this.distance[ttmw]+1;
+        //     }
+        //     v.calculateDistance(newDistance);
+        // }
+    }
 }
 
-execute(data);
+class Cave {
+    depth: number;
+    target: Pos;
+    size: Pos;
+    storage: CaveElement[][];
+
+    constructor(d: number, t: Pos) {
+        this.depth = d;
+        this.size = {x: t.x+25, y: t.y+25};
+        this.target = {x: t.x, y: t.y};
+
+        this.storage = new Array<CaveElement[]>();
+        for(let y = 0; y < this.size.y; y++) {
+            let tmp = new Array<CaveElement>();
+            for(let x = 0; x < this.size.x; x++) {
+                tmp.push(new CaveElement({x: x, y:y}, this));
+            }
+            this.storage.push(tmp);
+        }
+    }
+
+    display() {
+        for(let y = 0; y < this.size.y; y++) {
+            let str = '';
+            let dist = '';
+            for(let x = 0; x < this.size.x; x++) {
+                str += this.storage[y][x].type;
+                if (x < 17) {
+                    dist += (this.storage[y][x].distance[Using.tourch] == undefined) ? './' : this.storage[y][x].distance[Using.tourch] + '/';
+                    dist += (this.storage[y][x].distance[Using.climbinggear] == undefined) ? './' : this.storage[y][x].distance[Using.climbinggear] + '/';
+                    dist += (this.storage[y][x].distance[Using.nothing] == undefined) ? '.-' : this.storage[y][x].distance[Using.nothing] + '-';
+                }
+            }
+            console.log(str + '     ' + dist);
+        }
+    }
+
+
+
+    build() {
+        this.storage[0][0].gi = 0;
+        this.storage[0][0].el = ( this.storage[0][0].gi + this.depth ) % 20183;
+        for (let y = 1; y < this.size.y; y++) {
+            this.storage[y][0].gi = y * 48271;
+            this.storage[y][0].el = ( this.storage[y][0].gi + this.depth ) % 20183;
+        }
+        for (let x = 1; x < this.size.x; x++) {
+            this.storage[0][x].gi = x * 16807;
+            this.storage[0][x].el = ( this.storage[0][x].gi + this.depth ) % 20183;
+        }
+        for (let y = 1; y < this.size.y; y++) {
+            for (let x = 1; x < this.size.x; x++) {
+                if ( (x == this.target.y) && (y == this.target.y) ) {
+                    this.storage[y][x].gi = 0;
+                    this.storage[y][x].el = ( this.storage[y][x].gi + this.depth ) % 20183;
+                } else {
+                    if ((this.storage[y][x-1].el == undefined) || (this.storage[y-1][x].el == undefined)) {
+                        throw('Undefined el if parent');
+                    }
+                    this.storage[y][x].gi = this.storage[y][x-1].el * this.storage[y-1][x].el;
+                    this.storage[y][x].el = ( this.storage[y][x].gi + this.depth ) % 20183;
+                }
+            }
+        }
+        for (let y = 0; y < this.size.y; y++) {
+            for (let x = 0; x < this.size.x; x++) {
+                if (this.storage[y][x].el == undefined)
+                    throw('el not defined');
+                if (this.storage[y][x].gi == undefined)
+                    throw('gi not defined');
+
+                switch (this.storage[y][x].el % 3) {
+                    case 0: this.storage[y][x].type = '.';
+                        break;
+                    case 1: this.storage[y][x].type = '=';
+                        break;
+                    case 2: this.storage[y][x].type = '|';
+                        break;
+                }
+            }
+        }
+
+        this.storage[0][0].type = 'M';
+        this.storage[this.target.y][this.target.x].type = 'T';
+    }
+
+    risk() {
+        let risk = 0;
+        for (let y = 0; y <= this.target.y; y++) {
+            for (let x = 0; x <= this.target.x; x++) {
+                switch (this.storage[y][x].type) {
+                    case '.':
+                        break;
+                    case '=':
+                        risk += 1;
+                        break;
+                    case '|':
+                        risk += 2;
+                        break;
+                    case 'M':
+                        break;
+                    case 'T':
+                        break;
+                    default:
+                        throw ('unkown type');
+
+                }
+            }
+        }
+        console.log('Risk: ' + risk);
+    }
+}
+
+function execute(d: number, t: Pos) {
+    let cave = new Cave(d, t);
+    cave.build();
+    cave.display();
+    cave.risk();
+
+    cave.storage[0][0].calculateDistance({[Using.tourch]: 0, [Using.climbinggear]: ChangeTime, [Using.nothing]: undefined}, cave.storage[cave.target.y][cave.target.x]);
+    console.log('Distance: ');
+    cave.display();
+    console.log(JSON.stringify(cave.storage[cave.target.y][cave.target.x].distance));
+}
+
+//execute(510, {x: 10, y: 10});
+execute(6084, {x: 14, y: 709});
 //run();
