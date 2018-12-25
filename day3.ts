@@ -1,371 +1,477 @@
 import { data } from "./data";
 import { dataTest } from "./data";
 
-const Range = 1000000;
-const Step =  100000;
-const RangeMid = {"x":22000000,"y":24000000,"z":39000000}
-
-interface Pos {
-    x: number,
-    y: number,
-    z: number
+enum ArmyType {
+    ImmuneSystem,
+    Infection,
 }
 
-function distanceToOrigin(p: Pos): number {
-    return Math.abs(p.x) + Math.abs(p.y) + Math.abs(p.z);
+enum AttackType {
+    bludgeoning,
+    slashing,
+    fire,
+    radiation,
+    cold,
 }
 
-class PrioList<T> {
-    storage: T[] = [];
-    comp: (a: T, b: T ) => number;
+export class Group {
+    static static_id = 1;
+    id: number;
+    units: number;
+    hitpoints: number;              // amount of damage a unit can take before it is destroyed
+    attackdamage: number;           // the amount of damage each unit deals
+    attacktype: AttackType;
+    initiative: number;             // higher initiative units attack first and win ties
+    weaknesses: AttackType[];
+    immunities: AttackType[];
+    armee: Army;
 
-    constructor(comp: (a: T, b: T ) => number) {
-        this.comp = comp;
-    }
+    toBeAttackedBy: Group;
+    target: Group;
 
-    add(e: T) {
-        this.storage.push(e);
-        let index = this.storage.length-1;
-        let parent = this.storage.length-2;
-        while (index > 0 &&  this.comp(this.storage[index], this.storage[parent]) < 0) {
-            // exchange
-            let tmp = this.storage[index];
-            this.storage[index] = this.storage[parent];
-            this.storage[parent] = tmp;
+    static getId_length = 0;
 
-            index = parent;
-            parent = index-1;
-}
-    }
-
-    pop(): T {
-        return this.storage.pop();
-    }
-
-    isEmpty(): boolean {
-        if (this.storage.length == 0) return true;
-        return false;
-    }
-}
-
-function compare(a: Robot, b: Robot): number {
-    return a.getOverlapCount() - b.getOverlapCount();
-}
-
-class Robot {
-    static staticcount: number = 0;
-    id: Number;
-    pos: Pos;
-    r: number;
-    overlaplist: Robot[] = [];
-    overlapall: Robot[] = [];
-
-    calculateNearOrigin() {
-        let nearToOrigin: Pos[] = [];
-        for (let robot of this.overlapall) {
-            nearToOrigin.push(robot.getNearToOrigin());
+    printDetails() {
+        let weak = '';
+        if (this.weaknesses.length > 0) {
+            weak += 'weak to ';
+            let tmp = new Array<string>();
+            this.weaknesses.map(a => tmp.push(this._mapType2String(a)));
+            weak += tmp.join(', ');
+            weak += ')';
         }
-        nearToOrigin.sort((a,b) => distanceToOrigin(b) - distanceToOrigin(a));
-        // console.log('List: ' + JSON.stringify(nearToOrigin));
-        console.log('Point ' + JSON.stringify(nearToOrigin[0]) + ' Distance: ' + distanceToOrigin(nearToOrigin[0]));
-        
-        // console.log('Point ' + JSON.stringify(nearToOrigin[nearToOrigin.length-1]) + ' Distance: ' + distanceToOrigin(nearToOrigin[nearToOrigin.length-1]));
-        while(nearToOrigin.length != 0) {
-            let tmp = nearToOrigin.pop();
-            let count = 0;
-            for (let rob of this.overlapall)
-            {
-                if (rob.inRange(tmp)) {
-                    count++;
-                }
-            }
-            if (count == this.overlapall.length) {
-                console.log('This point is in all robots: ' + JSON.stringify(tmp) + ' Dist: ' + distanceToOrigin(tmp));
-            }
-        }
-    }
-
-
-
-    checkOne(): boolean {
-        let check = this.getOverlapCount();
-        let tmp = this.overlaplist.pop();
-        let count = 0;
-        for (let r of this.overlaplist) {
-            if (tmp.overlap(r)) count++;
-        }
-        if (count == this.overlaplist.length)
-            this.overlapall.push(tmp);
-
-        if (this.getOverlapCount() > check) {
-            throw('This shall not happen');
-        }
-
-        if (this.overlaplist.length == 0) return false;
-        return true;
-    }
-    
-    toString(): string {
-        let str = '';
-
-        str += 'ID: ' + this.id + ' Overlapcount: ' + this.getOverlapCount() + ' (' + this.overlapall.length + '/' + this.overlaplist.length + ') R: ' + this.r + ' POS: ' + JSON.stringify(this.pos);
-
-        return str;
-    }
-
-    getOverlapCount(): number {
-        return this.overlaplist.length + this.overlapall.length;
-    }
-
-    initOverlap(robot: Robot[]) {
-        for (let i = 0; i < robot.length; i++) {
-            if (robot[i] !== this) {
-                if (this.overlap(robot[i]))
-                    this.overlaplist.push(robot[i]);
-            }
-        }
-        this.overlapall.push(this);
-    }
-
-    toOrigin(): number {
-        return Math.abs(this.pos.x) + Math.abs(this.pos.z) + Math.abs(this.pos.y);
-    }
-
-    getNearToOrigin(): Pos {
-        let diff = {x: -this.pos.x, y: -this.pos.y, z: -this.pos.z};
-        let sum = Math.abs(diff.x) + Math.abs(diff.y) + Math.abs(diff.z);
-        let pos = {x: this.pos.x+Math.round(diff.x*this.r/sum), y: this.pos.y+Math.round(diff.y*this.r/sum), z: this.pos.z+Math.round(diff.z*this.r/sum)};
-
-        if (this.distance(pos) < this.r) {
-            if ((Math.abs(diff.x) > Math.abs(diff.y)) && (Math.abs(diff.x) > Math.abs(diff.z))) {
-                pos.x += diff.x/Math.abs(diff.x);
-            }
-            if ((Math.abs(diff.y) > Math.abs(diff.x)) && (Math.abs(diff.y) > Math.abs(diff.z))) {
-                pos.y += diff.y/Math.abs(diff.y);
-            }
-            if ((Math.abs(diff.z) > Math.abs(diff.x)) && (Math.abs(diff.z) > Math.abs(diff.y))) {
-                pos.z += diff.z/Math.abs(diff.z);
-            }            
-        } else if (this.distance(pos) > this.r) {
-            if ((Math.abs(diff.x) > Math.abs(diff.y)) && (Math.abs(diff.x) > Math.abs(diff.z))) {
-                pos.x -= diff.x/Math.abs(diff.x);
-            }
-            if ((Math.abs(diff.y) > Math.abs(diff.x)) && (Math.abs(diff.y) > Math.abs(diff.z))) {
-                pos.y -= diff.y/Math.abs(diff.y);
-            }
-            if ((Math.abs(diff.z) > Math.abs(diff.x)) && (Math.abs(diff.z) > Math.abs(diff.y))) {
-                pos.z -= diff.z/Math.abs(diff.z);
-            }
-        }
-        
-        /// only for check
-        if (this.distance(pos) != this.r) {
-            console.log('*************** Problem2 ***************');
-            throw('Shall be at distance ');
-        }
-
-        return pos;
-    }
-
-    overlap(rob: Robot): boolean {
-        let robsmallr: Robot = rob;
-        let robbigr: Robot = this;
-        
-        if (rob.r > this.r) {
-            robsmallr = this;
-            robbigr = rob;
-        }
-
-        let r = robsmallr.r;
-        let diff = {x: -robsmallr.pos.x+robbigr.pos.x, y: -robsmallr.pos.y+robbigr.pos.y, z: -robsmallr.pos.z+robbigr.pos.z};
-        let sum = Math.abs(diff.x) + Math.abs(diff.y) + Math.abs(diff.z);
-        let p = {x: robsmallr.pos.x + Math.round(diff.x*r/sum), y: robsmallr.pos.y+Math.round(diff.y*r/sum), z: robsmallr.pos.z+Math.round(diff.z*r/sum)};
-        if (robsmallr.distance(p) < robsmallr.r) {
-            // console.log('Diff: ' + Math.abs(robsmallr.distance(p) - robsmallr.r));
-            // console.log(p);
-            if ((Math.abs(diff.x) > Math.abs(diff.y)) && (Math.abs(diff.x) > Math.abs(diff.z))) {
-                p.x += diff.x/Math.abs(diff.x);
-            }
-            if ((Math.abs(diff.y) > Math.abs(diff.x)) && (Math.abs(diff.y) > Math.abs(diff.z))) {
-                p.y += diff.y/Math.abs(diff.y);
-            }
-            if ((Math.abs(diff.z) > Math.abs(diff.x)) && (Math.abs(diff.z) > Math.abs(diff.y))) {
-                p.z += diff.z/Math.abs(diff.z);
-            }
-            // console.log('Diff: ' + Math.abs(robsmallr.distance(p) - robsmallr.r));
-            // console.log(p);
-        } else if (robsmallr.distance(p) > robsmallr.r) {
-            // console.log('Diff: ' + Math.abs(robsmallr.distance(p) - robsmallr.r));
-            // console.log(p);
-            if ((Math.abs(diff.x) > Math.abs(diff.y)) && (Math.abs(diff.x) > Math.abs(diff.z))) {
-                p.x -= diff.x/Math.abs(diff.x);
-            }
-            if ((Math.abs(diff.y) > Math.abs(diff.x)) && (Math.abs(diff.y) > Math.abs(diff.z))) {
-                p.y -= diff.y/Math.abs(diff.y);
-            }
-            if ((Math.abs(diff.z) > Math.abs(diff.x)) && (Math.abs(diff.z) > Math.abs(diff.y))) {
-                p.z -= diff.z/Math.abs(diff.z);
-            }
-            // console.log('Diff: ' + Math.abs(robsmallr.distance(p) - robsmallr.r));
-            // console.log(p);
-        }
-        
-
-        
-        /// only for check
-        if (robsmallr.distance(p) != robsmallr.r) {
-            console.log('*************** Problem ***************');
-            console.log('Robot small: ' + JSON.stringify(robsmallr.pos) + ' R: ' + robsmallr.r);
-            console.log('Robot big: ' + JSON.stringify(robbigr.pos) + ' R: ' + robbigr.r);
-            console.log('Difs: ' + JSON.stringify(diff) + ' Sum: ' + sum);
-            console.log('Prop x: ' + Math.round(diff.x/sum*100) + ' y:' + Math.round(diff.y/sum*100) + ' z: ' + Math.round(diff.z/sum*100));
-            console.log('Point: ' + JSON.stringify(p) + ' Overlap: ' + robbigr.inRange(p));
-            console.log('WithComa: ' + JSON.stringify({x: robsmallr.pos.x + (diff.x*r/sum), y: robsmallr.pos.y+(diff.y*r/sum), z: robsmallr.pos.z+(diff.z*r/sum)}));
-            throw('Shall be at distance ' + robsmallr.r + ' but distance is ' + robsmallr.distance(p));
-        }
-
-        // console.log('Robot small: ' + JSON.stringify(robsmallr.pos) + ' ' + robsmallr.r + ' Big: ' +
-        //     JSON.stringify(robbigr.pos) + ' ' + robbigr.r + ' P: ' + JSON.stringify(p) + ' Overlap: ' + robbigr.inRange(p));
-
-        if (robbigr.inRange(p)) return true;
-
-        return false;
-    }
-
-    constructor(p: Pos, r: number) {
-        this.pos = p;
-        this.r = r;
-        this.id = Robot.staticcount;
-        Robot.staticcount++;
-
-        // console.log('New Robot with: ' + this.r + ' ' + JSON.stringify(this.pos));
-    }
-
-    distance(r: Robot | Pos): number {
-        if (r instanceof Robot)
-            return Math.abs(r.pos.x - this.pos.x) + Math.abs(r.pos.z - this.pos.z) + Math.abs(r.pos.y - this.pos.y);
-        else 
-            return Math.abs(r.x - this.pos.x) + Math.abs(r.z - this.pos.z) + Math.abs(r.y - this.pos.y);
-    }
-
-    inRange(r: Pos | Robot): boolean {
-        if (this.distance(r) <= this.r) {
-            return true;
-        }
-
-        return false;
-    }
-
-}
-
-class Robots {
-    robots: Robot[] = [];
-
-    constructor(data: string[]) {
-        for(let line of data) {
-            // console.log('Processing line: ' + line);
-            this.robots.push(this.createRobot(line));
-        }
-    }
-
-    createRobot(line: string) {
-        let r = Number(line.split('>, r=')[1]);
-        let x = Number(line.split('>, r=')[0].split('os=<')[1].split(',')[0]);
-        let y = Number(line.split('>, r=')[0].split('os=<')[1].split(',')[1]);
-        let z = Number(line.split('>, r=')[0].split('os=<')[1].split(',')[2]);
-    
-        return new Robot({x: x, y:y,z:z}, r);
-    }
-
-    getMaxR(): Robot {
-        // console.log('Robots: ' + JSON.stringify(this.robots));
-        let ret = this.robots[0];
-
-        this.robots.map((a) => {
-            if (a.r > ret.r) 
-                ret = a;
-         });
-
-        return ret;
-    }
-
-    getInRange(r: Robot): Robot[] {
-        let robots = Array<Robot>();
-        this.robots.map(a => {
-            if (r.inRange(a) == true)
-                robots.push(a)
-        });
-
-        return robots;
-
-    }
-
-    getInTarget(p: Pos): Robot[] {
-        let robots = Array<Robot>();
-        this.robots.map(a => {
-            if (a.inRange(p) == true)
-                robots.push(a)
-        });
-
-        return robots;
-    }
-
-    calculate(): Robot {
-        this.robots.sort((a,b) => b.r - a.r);
-        let prioList = new PrioList<Robot>(compare);
-
-        for (let i = 0; i < this.robots.length; i++) {
-            this.robots[i].initOverlap(this.robots);
-            prioList.add(this.robots[i]);
-        }
-
-        let last: Robot = undefined;
-        while(!prioList.isEmpty()) {
-            let tmp = prioList.pop();
-            if ((last != undefined) && (last.getOverlapCount() >= tmp.getOverlapCount())) {
-                // we found what we search for
-                return last;
-            }
-            // console.log('PrioList: ' + prioList.storage.length + ' Checking: ' + tmp.toString());
-            if (tmp.checkOne()) {
-                prioList.add(tmp);
-            } else {
-                last = tmp;
-            }
-            // console.log('PrioList: ' + prioList.storage.length + ' Checking: ' + tmp.toString());
+        let immunities = '';
+        if (this.immunities.length > 0) {
+            immunities += '(immune to ';
+            let tmp = new Array<string>();
+            this.immunities.map(a => tmp.push(this._mapType2String(a)));
+            immunities += tmp.join(', ');
             
         }
-
-        // for (let i = 0; i < this.robots.length; i++) {
-        //     this.robots.sort((a,b) => - a.getOverlapCount() + b.getOverlapCount());
-        //     console.log('Robot : ' + i + ' overlaps with ' + this.robots[i].getOverlapCount());
-        //     this.robots = this.robots.filter(a => a)
-        // }
+        let weak_imm = '';
+        if ((weak.length > 0) && (immunities.length > 0))
+        {
+            weak_imm += ' ' + immunities +'; ' + weak;
+        } else if ((weak.length > 0)) {
+            weak_imm += ' (' + weak
+        } else if (immunities.length > 0) {
+            weak_imm += ' ' + immunities + ')';
+        }
+        console.log(this.units + ' units each with ' + this.hitpoints + ' hit points' + weak_imm + ' with an attack that does ' + this.attackdamage +
+            ' ' + this._mapType2String(this.attacktype) + ' damage at initiative ' + this.initiative);
     }
 
+    getId(): number {
+        if (Group.getId_length == 0) Group.getId_length = this.armee.war.immuneSystem.groups.length;
+        if (this.armee.type == ArmyType.Infection) 
+            return this.id - Group.getId_length;
+
+        return this.id
+    }
+
+    returnMoreDamage(target1: Group, target2: Group): Group {
+        if ((target1 == undefined) && (target2 == undefined)) return undefined;
+        if (target1 == undefined) {
+            if (target2.toBeAttackedBy == undefined) {
+                return target2;
+            } else {
+                return undefined;
+            }
+        }
+        if (target2 == undefined) {
+            if (target1.toBeAttackedBy == undefined) {
+                return target1;
+            } else {
+                return undefined;
+            }
+        }
+
+        if (this.calculateMaxPossibleDamage(target1) > this.calculateMaxPossibleDamage(target2)) {
+            return target1;
+        }
+
+        if (this.calculateMaxPossibleDamage(target2) > this.calculateMaxPossibleDamage(target1)) {
+            return target2;
+        }
+
+        if (this.calculateMaxPossibleDamage(target1) == this.calculateMaxPossibleDamage(target2)) {
+            if (target1.getEffectivePower() > target2.getEffectivePower()) {
+                return target1;
+            }
+            if (target1.getEffectivePower() < target2.getEffectivePower()) {
+                return target2;
+            }
+            
+            if (target1.getEffectivePower() == target2.getEffectivePower()) {
+                if (target1.initiative > target2.initiative) {
+                    return target1;
+                }
+                if (target1.initiative < target2.initiative) {
+                    return target2;
+                }
+                if (target1.initiative == target2.initiative) {
+                    throw('TODO not sure what to do here');
+                } else
+                    throw('ASSERT this shall never been reached');
+            } else
+                throw('ASSERT this shall never been reached');
+        } else {
+            throw('ASSERT this shall never been reached');
+        }
+        
+
+    }
+
+    calculateMaxPossibleDamage(target: Group): number {
+        let tmp = this.getEffectivePower();
+
+        if (target.isImmune(this))
+            tmp *= 0;
+
+        if (target.isWeak(this))
+            tmp *= 2;
+
+        return tmp;
+    }
+
+    isWeak(attacker: Group): boolean {
+        let index = this.weaknesses.findIndex((a,i,self) => a == attacker.attacktype);
+
+        return (index >= 0);
+    }
+
+    isImmune(attacker: Group): boolean {
+        let index = this.immunities.findIndex((a,i,self) => a == attacker.attacktype);
+
+        return (index >= 0);
+    }
+
+    attack() {
+        if (this.units <= 0) return;
+        if (this.target == undefined) {
+            console.log('ID: ' + this.getId() + ' has no target');
+            return;
+        }
+
+        let maxdamage = this.calculateMaxPossibleDamage(this.target);
+        let loses = Math.floor(maxdamage / this.target.hitpoints);
+        if (loses > this.target.units)
+            loses = this.target.units;
+
+        this.target.units -= loses;
+        
+        if (this.target.units <= 0)
+            this.target.die();
+
+
+        //console.log('ID: ' + this.id + ' attacks ' + this.target.id + ' with a maxdamage of ' + maxdamage + ' causes the loss of ' + loses + ' units');
+        console.log(this.armee.getType() + ' group ' + this.getId() + ' attacks group ' + this.target.getId() + ', killing ' + loses + ' units');
+    }
+
+    die() {
+        this.units = 0;
+        this.armee.remove(this)
+        // throw('Check what to do here');
+    }
+
+    setAttacker(g: Group) {
+        if (this.toBeAttackedBy == undefined) 
+            this.toBeAttackedBy = g;
+        else
+            throw('Can not attack an already under attack');
+    }
+
+    setTarget(g: Group) {
+        if (this.target == undefined)
+            this.target = g;
+        else 
+            throw('Already a target');
+
+        //console.log('ID: ' + this.id + ' has selected as target ID: ' + this.target.id);
+    }
+
+    resetAttack() {
+        this.toBeAttackedBy = undefined;
+        this.target = undefined;
+    }
+
+    private _createAttackType(line: string): AttackType {
+        let tmp = line.split('with an attack that does ')[1].split(' ')[1]
+        return this._mapString2Type(tmp);
+    }
+
+    private _mapString2Type(word: string): AttackType {
+        switch (word) {
+            case 'bludgeoning': return AttackType.bludgeoning;
+            case 'slashing': return AttackType.slashing;
+            case 'fire': return AttackType.fire;
+            case 'radiation': return AttackType.radiation;
+            case 'cold': return AttackType.cold;
+            default: 
+                throw('Unknown attacktype "' + word + '"');
+        }
+    }
+
+    private _mapType2String(type: AttackType): string {
+        switch (type) {
+            case AttackType.bludgeoning: return 'bludgeoning';
+            case AttackType.slashing: return 'slashing';
+            case AttackType.fire: return 'fire';
+            case AttackType.radiation: return 'radiation';
+            case AttackType.cold: return 'cold';
+            default: 
+                throw('Unknown attacktype "' + type + '"');
+        }
+    }
+
+    private _createWeakImmunity(line: string) {
+        this.weaknesses = new Array<AttackType>();
+        this.immunities = new Array<AttackType>();
+
+        if (!line.includes('(')) return
+        
+        let tmp = line.split('(')[1].split(')')[0];
+        
+        if (tmp.includes('weak to ')) {
+            let weak = tmp.split('weak to ')[1].split(';')[0].split(', ');
+            for (let w of weak) {
+                this.weaknesses.push(this._mapString2Type(w));
+            }
+        }
+        
+        if (tmp.includes('immune to ')) {
+            let weak = tmp.split('immune to ')[1].split(';')[0].split(', ');
+            for (let w of weak) {
+                this.immunities.push(this._mapString2Type(w));
+            }
+        }
+
+    }
+
+    getEffectivePower(): number {
+        return this.units * this.attackdamage;
+    }
+
+    constructor(line: string, a?: Army) {
+        this.id = Group.static_id++;
+        this.armee = a;
+        this.units = Number(line.split(' ')[0]);
+        this.hitpoints = Number(line.split(' ')[4]);
+        this.attackdamage = Number(line.split('with an attack that does ')[1].split(' ')[0]);
+        this.initiative = Number(line.split('initiative ')[1]);
+        this.attacktype = this._createAttackType(line);
+        this._createWeakImmunity(line);
     
+        // console.log('Group: ' + line);
+        // console.log(this);
+    }
 }
 
-function toOrigin(pos:Pos): number {
-    return Math.abs(pos.x) + Math.abs(pos.z) + Math.abs(pos.y);
+class Army {
+    type: ArmyType;
+    groups: Group[];
+    war: War;
+
+    getType(): string {
+        if (this.type == ArmyType.ImmuneSystem) return 'Immune System';
+        if (this.type == ArmyType.Infection) return 'Infection';
+    }
+
+    remove(g: Group) {
+        this.groups = this.groups.filter((a) => a !== g);
+
+    }
+
+    printDetails() {
+        console.log(this.getType() + ':');
+        this.groups.map(a => a.printDetails());
+        console.log();
+    }
+
+    printGroups() {
+        let count = 1;
+        if (this.type == ArmyType.ImmuneSystem) console.log('Immune System');
+        if (this.type == ArmyType.Infection) console.log('Infection');
+        for (let g of this.groups) {
+            console.log('Group ' + g.getId() + ' contains ' + g.units + ' units');
+            count++;
+        }
+
+    }
+
+    getUnits(): number {
+        let tmp = 0;
+        for (let g of this.groups) {
+            tmp += g.units;
+        }
+
+        return tmp;
+    }
+
+
+    constructor(data: string[], w: War) {
+        this.war = w;
+        this.groups = new Array<Group>();
+        for (let line of data) {
+            this.groups.push(new Group(line, this));
+        }
+    }
+}
+
+class ImmuneSystem extends Army {
+    constructor(data: string[], w: War) {
+        super(data, w);
+        this.type = ArmyType.ImmuneSystem;
+    }
+}
+
+class Infection extends Army {
+    constructor(data: string[], w: War) {
+        super(data, w);
+        this.type = ArmyType.Infection;
+    }
+}
+
+class War {
+    finish(): boolean {
+        if (this.immuneSystem.getUnits() == 0) return true;
+        if (this.infection.getUnits() == 0) return true;
+        return false;
+    }
+
+    getWinner(): Army {
+        if (this.immuneSystem.getUnits() == 0) return this.infection;
+        if (this.infection.getUnits() == 0) return this.immuneSystem;
+        throw('Error');
+    }
+
+    immuneSystem: ImmuneSystem;
+    infection: Infection;
+
+    getAllGroups(): Group[] {
+        let tmp = new Array<Group>();
+        this.immuneSystem.groups.map(a => tmp.push(a));
+        this.infection.groups.map(a=> tmp.push(a));
+        
+        return tmp;
+    }
+
+    print() {
+        this.immuneSystem.printDetails();
+        this.infection.printDetails();
+    }
+
+    constructor(data: string[]) {
+        let readData: string[][];
+        let reading: ArmyType;
+
+        readData = new Array<string[]>(2);
+        readData[ArmyType.ImmuneSystem] = new Array<string>();
+        readData[ArmyType.Infection] = new Array<string>();
+
+        for(let line of data) {
+            
+            if (line.indexOf('Immune System')>= 0) {
+                reading = ArmyType.ImmuneSystem;
+                continue;
+            }
+            if (line.indexOf('Infection')>= 0) {
+                reading = ArmyType.Infection;
+                continue;
+            }
+            if (line.length == 0) continue;
+
+            readData[reading].push(line);
+        }
+
+        this.immuneSystem = new ImmuneSystem(readData[ArmyType.ImmuneSystem], this);
+        this.infection = new Infection(readData[ArmyType.Infection], this);
+
+    }
+
+    targetSelection() {
+        let allgroups  = this.getAllGroups();
+        let alltargets = this.getAllGroups();
+        
+        allgroups.sort((a,b) => {
+        if (a.getEffectivePower() == b.getEffectivePower()) {
+            return b.initiative - a.initiative;
+        } else return b.getEffectivePower() - a.getEffectivePower();
+        });
+
+        // if (1) {
+        //     console.log('Shall be order by Effective Power if equal by initiative:');
+        //     console.log(allgroups);
+        //     throw ('Final');
+        // }
+
+        for (let g of allgroups) {
+            g.resetAttack();
+        }
+
+        for (let attacker of allgroups) {
+            let toAttack: Group;
+            for (let possibleTarget of alltargets) {
+                if (attacker === possibleTarget)                // do not check for my self
+                    continue;
+                if (possibleTarget.armee === attacker.armee)    // do not check for those of my armee
+                    continue;
+                
+                toAttack = attacker.returnMoreDamage(toAttack, possibleTarget);
+            }
+            if (toAttack != undefined) {
+                console.log(attacker.armee.getType() + ' group ' + attacker.getId() + ' will attack group ' + toAttack.getId() + ' ' + attacker.calculateMaxPossibleDamage(toAttack) + ' damage');
+                toAttack.setAttacker(attacker);
+                attacker.setTarget(toAttack);
+                alltargets = alltargets.filter((v, i, self) => v !== toAttack);
+            }
+        }
+
+    }
+
+    targetAttack() {
+        let attackers = this.getAllGroups();
+        attackers.sort((a,b) => b.initiative - a.initiative);
+
+        // if (1) {
+        //     console.log('Shall by order by initiative');
+        //     console.log(tmp);
+        //     throw('Check');
+        // }
+        for (let a of attackers) {
+            a.attack();
+        }
+    }
+
+
 }
 
 
 function execute(data: string[]) {
-    let robots = new Robots(data);
+    let war = new War(data);
+    let i = 1;
 
-    console.log('Robot with more radius: ' + JSON.stringify(robots.getMaxR()));
-    let inRange = robots.getInRange(robots.getMaxR());
+    war.print();
 
-    console.log('Count of Robots: ' + robots.robots.length);
-    console.log('Robots in Range: ' +  inRange.length);
+    while(!war.finish()) {
+        console.log('*** Round: ' + i++ + ' ***');
+        war.immuneSystem.printGroups();
+        war.infection.printGroups();
+        console.log();
+        war.targetSelection();
+        console.log();
+        war.targetAttack();
+    }
 
-    let max = robots.calculate();
-
-    console.log('Overlap all: \n' + max.toString());
-
-    max.calculateNearOrigin();
-
+    console.log('*** RESULT ***');
+    war.immuneSystem.printGroups();
+    war.infection.printGroups();
+    console.log();
+    console.log('Units: ' + war.immuneSystem.getUnits() + ' ' + war.infection.getUnits());
+    let winner = war.getWinner();
+    console.log('Winner' + winner.type);
+    console.log('Total Units: ' + winner.getUnits());
+    
 }
 
-execute(data);
+execute(dataTest);
