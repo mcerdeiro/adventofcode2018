@@ -1,5 +1,10 @@
 import { data } from "./data";
 import { dataTest } from "./data";
+import { dataTest2 } from "./data";
+
+//const boost = 22351; //22350 > 22352
+const boost = 0;
+const boostattackdamage = 84; // 75 a 87
 
 enum ArmyType {
     ImmuneSystem,
@@ -18,8 +23,8 @@ export class Group {
     static static_id = 1;
     id: number;
     units: number;
-    hitpoints: number;              // amount of damage a unit can take before it is destroyed
-    attackdamage: number;           // the amount of damage each unit deals
+    hitpointsplus: number;              // amount of damage a unit can take before it is destroyed
+    attackdamageplus: number;           // the amount of damage each unit deals
     attacktype: AttackType;
     initiative: number;             // higher initiative units attack first and win ties
     weaknesses: AttackType[];
@@ -30,6 +35,42 @@ export class Group {
     target: Group;
 
     static getId_length = 0;
+
+    getAttackDamage(): number {
+        if (this.armee == undefined)
+            throw('error');
+        if (this.armee.type == undefined)
+            throw('error');
+
+        if (this.armee.type == ArmyType.ImmuneSystem)
+            return this.attackdamageplus + boostattackdamage;
+        else
+            return this.attackdamageplus;
+    }
+
+    getHitpoints(): number {
+        if (this.armee.type == ArmyType.ImmuneSystem)
+            return this.hitpointsplus + boost;
+        else
+            return this.hitpointsplus;
+    }
+
+    getPossibleTargets(): Group[] {
+        let tmp = new Array<Group>();
+        if (this.armee.type == ArmyType.ImmuneSystem) {
+            this.armee.war.infection.groups.map(a => {
+                if ((a.toBeAttackedBy == undefined) && (a.units > 0))
+                    tmp.push(a);
+            });
+        } else {
+            this.armee.war.immuneSystem.groups.map(a => {
+                if ((a.toBeAttackedBy == undefined) && (a.units > 0))
+                    tmp.push(a);
+            });
+        }
+
+        return tmp;
+    }
 
     printDetails() {
         let weak = '';
@@ -57,7 +98,7 @@ export class Group {
         } else if (immunities.length > 0) {
             weak_imm += ' ' + immunities + ')';
         }
-        console.log(this.units + ' units each with ' + this.hitpoints + ' hit points' + weak_imm + ' with an attack that does ' + this.attackdamage +
+        console.log(this.units + ' units each with ' + this.getHitpoints() + ' hit points' + weak_imm + ' with an attack that does ' + this.getAttackDamage() +
             ' ' + this._mapType2String(this.attacktype) + ' damage at initiative ' + this.initiative);
     }
 
@@ -149,12 +190,12 @@ export class Group {
     attack() {
         if (this.units <= 0) return;
         if (this.target == undefined) {
-            console.log('ID: ' + this.getId() + ' has no target');
+            // console.log('ID: ' + this.getId() + ' has no target');
             return;
-        }
+        } if (this.target.units <= 0) return;
 
         let maxdamage = this.calculateMaxPossibleDamage(this.target);
-        let loses = Math.floor(maxdamage / this.target.hitpoints);
+        let loses = Math.floor(maxdamage / this.target.getHitpoints());
         if (loses > this.target.units)
             loses = this.target.units;
 
@@ -163,14 +204,16 @@ export class Group {
         if (this.target.units <= 0)
             this.target.die();
 
-
+            //print 'Team ' + str(1-team_i) + ' HP ' + str(teams[team_i][index][HP]) + ' attacks HP: ' + str(teams[1-team_i][to_attack][HP]) + ' damage ' + str(d)
+        console.log('HP ' + this.getHitpoints() + ' attacks HP: ' + this.target.getHitpoints() + ' damage ' + loses);
         //console.log('ID: ' + this.id + ' attacks ' + this.target.id + ' with a maxdamage of ' + maxdamage + ' causes the loss of ' + loses + ' units');
-        console.log(this.armee.getType() + ' group ' + this.getId() + ' attacks group ' + this.target.getId() + ', killing ' + loses + ' units');
+        // console.log(this.armee.getType() + ' group ' + this.getId() + ' attacks group ' + this.target.getId() + ', killing ' + loses + ' units');
     }
 
     die() {
         this.units = 0;
-        this.armee.remove(this)
+        this.target = undefined;
+        // this.armee.remove(this)
         // throw('Check what to do here');
     }
 
@@ -249,15 +292,15 @@ export class Group {
     }
 
     getEffectivePower(): number {
-        return this.units * this.attackdamage;
+        return this.units * this.getAttackDamage();
     }
 
     constructor(line: string, a?: Army) {
         this.id = Group.static_id++;
         this.armee = a;
         this.units = Number(line.split(' ')[0]);
-        this.hitpoints = Number(line.split(' ')[4]);
-        this.attackdamage = Number(line.split('with an attack that does ')[1].split(' ')[0]);
+        this.hitpointsplus = Number(line.split(' ')[4]);
+        this.attackdamageplus = Number(line.split('with an attack that does ')[1].split(' ')[0]);
         this.initiative = Number(line.split('initiative ')[1]);
         this.attacktype = this._createAttackType(line);
         this._createWeakImmunity(line);
@@ -293,7 +336,7 @@ class Army {
         if (this.type == ArmyType.ImmuneSystem) console.log('Immune System');
         if (this.type == ArmyType.Infection) console.log('Infection');
         for (let g of this.groups) {
-            console.log('Group ' + g.getId() + ' contains ' + g.units + ' units');
+            console.log('Group ' + g.getId() + ' contains ' + g.units + ' units with hp: ' + g.getHitpoints());
             count++;
         }
 
@@ -332,7 +375,7 @@ class Infection extends Army {
     }
 }
 
-class War {
+export class War {
     finish(): boolean {
         if (this.immuneSystem.getUnits() == 0) return true;
         if (this.infection.getUnits() == 0) return true;
@@ -390,28 +433,25 @@ class War {
     }
 
     targetSelection() {
-        let allgroups  = this.getAllGroups();
-        let alltargets = this.getAllGroups();
-        
-        allgroups.sort((a,b) => {
-        if (a.getEffectivePower() == b.getEffectivePower()) {
-            return b.initiative - a.initiative;
-        } else return b.getEffectivePower() - a.getEffectivePower();
-        });
+        let tmp = this.immuneSystem.groups
+        tmp.sort()
 
-        // if (1) {
-        //     console.log('Shall be order by Effective Power if equal by initiative:');
-        //     console.log(allgroups);
-        //     throw ('Final');
-        // }
+        tmp.sort((a,b) => {
+            if (a.getEffectivePower() == b.getEffectivePower()) {
+                return b.initiative - a.initiative;
+            } else return b.getEffectivePower() - a.getEffectivePower();
+            });
 
-        for (let g of allgroups) {
+        for (let g of tmp) {
             g.resetAttack();
         }
 
-        for (let attacker of allgroups) {
+        for (let attacker of tmp) {
+            if (attacker.getEffectivePower() == 0) continue;
+            let possibleTargets = attacker.getPossibleTargets();
+
             let toAttack: Group;
-            for (let possibleTarget of alltargets) {
+            for (let possibleTarget of possibleTargets) {
                 if (attacker === possibleTarget)                // do not check for my self
                     continue;
                 if (possibleTarget.armee === attacker.armee)    // do not check for those of my armee
@@ -420,12 +460,61 @@ class War {
                 toAttack = attacker.returnMoreDamage(toAttack, possibleTarget);
             }
             if (toAttack != undefined) {
-                console.log(attacker.armee.getType() + ' group ' + attacker.getId() + ' will attack group ' + toAttack.getId() + ' ' + attacker.calculateMaxPossibleDamage(toAttack) + ' damage');
+                if (attacker.calculateMaxPossibleDamage(toAttack) != 0) {
+                // console.log(attacker.armee.getType() + ' group ' + attacker.getId() + ' will attack group ' + toAttack.getId() + ' ' + attacker.calculateMaxPossibleDamage(toAttack) + ' damage');
                 toAttack.setAttacker(attacker);
                 attacker.setTarget(toAttack);
-                alltargets = alltargets.filter((v, i, self) => v !== toAttack);
+                }
             }
         }
+        tmp.map(a=> {
+            if (a.target != undefined)
+                console.log('HP: ' + a.getHitpoints() + ' Power: ' + a.getEffectivePower() + ' selected ' + a.target.getHitpoints());
+            else   
+                console.log('HP: ' + a.getHitpoints() + ' Power: ' + a.getEffectivePower() + ' selected none');
+        });
+
+        tmp = this.infection.groups
+        tmp.sort()
+
+        tmp.sort((a,b) => {
+            if (a.getEffectivePower() == b.getEffectivePower()) {
+                return b.initiative - a.initiative;
+            } else return b.getEffectivePower() - a.getEffectivePower();
+            });
+
+        for (let g of tmp) {
+            g.resetAttack();
+        }
+
+        for (let attacker of tmp) {
+            if (attacker.getEffectivePower() == 0) continue;
+            let possibleTargets = attacker.getPossibleTargets();
+
+            let toAttack: Group;
+            for (let possibleTarget of possibleTargets) {
+                if (attacker === possibleTarget)                // do not check for my self
+                    continue;
+                if (possibleTarget.armee === attacker.armee)    // do not check for those of my armee
+                    continue;
+                
+                toAttack = attacker.returnMoreDamage(toAttack, possibleTarget);
+            }
+            if (toAttack != undefined) {
+                if (attacker.calculateMaxPossibleDamage(toAttack) != 0) {
+                // console.log(attacker.armee.getType() + ' group ' + attacker.getId() + ' will attack group ' + toAttack.getId() + ' ' + attacker.calculateMaxPossibleDamage(toAttack) + ' damage');
+                toAttack.setAttacker(attacker);
+                attacker.setTarget(toAttack);
+                }
+            }
+        }
+        tmp.map(a=> {
+            if (a.target != undefined)
+                console.log('HP: ' + a.getHitpoints() + ' Power: ' + a.getEffectivePower() + ' selected ' + a.target.getHitpoints());
+            else   
+                console.log('HP: ' + a.getHitpoints() + ' Power: ' + a.getEffectivePower() + ' selected none');
+        });
+        
 
     }
 
@@ -449,29 +538,48 @@ class War {
 
 function execute(data: string[]) {
     let war = new War(data);
-    let i = 1;
+    let i = 0;
 
     war.print();
 
     while(!war.finish()) {
-        console.log('*** Round: ' + i++ + ' ***');
-        war.immuneSystem.printGroups();
-        war.infection.printGroups();
-        console.log();
+        console.log('Results: ' + i++);
+        // war.immuneSystem.printGroups();
+        // war.infection.printGroups();
+        // console.log('Total Units: ' + (war.immuneSystem.getUnits()+war.infection.getUnits()));
+        // console.log();
         war.targetSelection();
-        console.log();
+        // console.log();
         war.targetAttack();
+
+        console.log('Team: 0');
+        for (let g of war.immuneSystem.groups) {
+            console.log('HP: ' + g.getHitpoints() + ' Units: ' + g.units);
+        }
+        console.log('Team: 1');
+        for (let g of war.infection.groups) {
+            console.log('HP: ' + g.getHitpoints() + ' Units: ' + g.units);
+        }
+        console.log('Total units: ' + (war.immuneSystem.getUnits() + war.infection.getUnits()));
+
+
+        // if (war.immuneSystem.getUnits() + war.infection.getUnits() <= 29013)  {
+        //     war.immuneSystem.printGroups();
+        //     war.infection.printGroups();
+        //     break;
+        // }
     }
 
-    console.log('*** RESULT ***');
-    war.immuneSystem.printGroups();
-    war.infection.printGroups();
-    console.log();
-    console.log('Units: ' + war.immuneSystem.getUnits() + ' ' + war.infection.getUnits());
+    // console.log('*** RESULT ***');
+    // war.immuneSystem.printGroups();
+    // war.infection.printGroups();
+    // console.log();
+    
+    // console.log('Units: ' + war.immuneSystem.getUnits() + ' ' + war.infection.getUnits());
     let winner = war.getWinner();
-    console.log('Winner' + winner.type);
-    console.log('Total Units: ' + winner.getUnits());
+    // console.log('Winner' + winner.type);
+    // console.log('Total Units: ' + winner.getUnits());
     
 }
 
-execute(dataTest);
+execute(data);
